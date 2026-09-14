@@ -69,6 +69,6 @@ Nginx (static frontend + /api proxy + WebSocket)  <--  Cloudflare Tunnel  <--  a
 | Phase | Scope | Status |
 |-------|-------|--------|
 | 1 | Foundation: schema, API skeleton, frontend shell, deployment config | done |
-| 2 | Market bot: exchange ingestion, 3-sigma anomalies, volume spikes, coordination, market dashboard | next |
-| 3 | Maritime bot: AIS ingestion, OFAC/EU/UN screening, evasion/transshipment, map, breach board, audit log UI, WebSocket | planned |
+| 2 | Market bot: exchange ingestion, 3-sigma anomalies, volume spikes, coordination, liquidation cascades, market dashboard | done |
+| 3 | Maritime bot: AIS ingestion, OFAC/EU/UN screening, evasion/transshipment, map, breach board, audit log UI, WebSocket | next |
 | 4 | Polish: exports (PDF/JSON/CSV), settings editor, CI, hardening | planned |

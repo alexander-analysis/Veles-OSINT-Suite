@@ -5,6 +5,7 @@ from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from app import __version__
+from app.bots.market import market_bot
 from app.bots.scheduler import scheduler_status
 from app.config import settings
 from app.database import DATABASE_PATH, engine, get_db
@@ -57,4 +58,5 @@ def health(response: Response, db: Session = Depends(get_db)) -> HealthResponse:
         scheduler=SchedulerHealth(enabled=settings.SCHEDULER_ENABLED, **scheduler_status()),
         last_market_update=last_market_update,
         last_ais_update=last_ais_update,
+        bots={"market": market_bot.status()} if db_ok else {},
     )

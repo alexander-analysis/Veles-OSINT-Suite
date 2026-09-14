@@ -54,3 +54,4 @@ class HealthResponse(APIModel):
     scheduler: SchedulerHealth
     last_market_update: datetime | None = Field(None, description="Newest market candle timestamp")
     last_ais_update: datetime | None = Field(None, description="Newest vessel position timestamp")
+    bots: dict[str, Any] = Field(default_factory=dict, description="Per-bot runtime status")

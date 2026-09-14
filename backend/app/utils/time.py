@@ -23,6 +23,11 @@ def from_unix_seconds(seconds: int | float) -> datetime:
     return datetime.fromtimestamp(seconds, tz=timezone.utc).replace(tzinfo=None)
 
 
+def to_unix_ms(value: datetime) -> int:
+    """Naive-UTC datetime -> epoch milliseconds (``value.timestamp()`` would assume *local* time)."""
+    return int(value.replace(tzinfo=timezone.utc).timestamp() * 1000)
+
+
 def to_iso_z(value: datetime | None) -> str | None:
     """Render a naive-UTC datetime as ISO-8601 with a ``Z`` suffix."""
     if value is None:

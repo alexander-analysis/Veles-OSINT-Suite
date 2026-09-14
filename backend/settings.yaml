@@ -21,6 +21,14 @@ market:
   coordination_window_seconds: 30
   coordination_min_correlation: 0.85
   coordination_min_move_percent: 2.0
+  coordination_lookback_minutes: 60
+  # Suppress repeat alerts of the same type for an asset/exchange unless severity rises
+  alert_cooldown_minutes: 30
+  # Binance futures liquidation stream -> cascade detection
+  liquidations_enabled: true
+  liquidation_gap_minutes: 2.0
+  liquidation_min_events: 5
+  liquidation_min_total_usd: 1000000
 
 maritime:
   ais_poll_interval_seconds: 30

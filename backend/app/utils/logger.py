@@ -5,6 +5,7 @@ under ``backend/logs/``:
 
 * ``veles.log``  - everything at LOG_LEVEL and above
 * ``errors.log`` - ERROR and above only
+* ``bots.log``   - only lines from the market/maritime bots and the scheduler
 
 Bots bind a ``component`` so their lines are easy to grep:
 ``logger.bind(component="market")``.
@@ -17,6 +18,7 @@ from loguru import logger
 from app.config import BACKEND_DIR, settings
 
 LOG_DIR = BACKEND_DIR / "logs"
+BOT_COMPONENTS = {"market", "maritime", "scheduler"}
 
 _FORMAT = (
     "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | "
@@ -33,6 +35,16 @@ def configure_logging() -> None:
         LOG_DIR / "veles.log",
         level=settings.LOG_LEVEL,
         format=_FORMAT,
+        rotation="10 MB",
+        retention="30 days",
+        compression="zip",
+        enqueue=True,
+    )
+    logger.add(
+        LOG_DIR / "bots.log",
+        level=settings.LOG_LEVEL,
+        format=_FORMAT,
+        filter=lambda record: record["extra"].get("component") in BOT_COMPONENTS,
         rotation="10 MB",
         retention="30 days",
         compression="zip",

@@ -28,20 +28,21 @@ the database is unreachable.
 
 ## Market (`/api/market`)
 
-### `GET /api/market/prices?assets=BTC,ETH&exchanges=binance,kraken`
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /prices?assets=BTC,ETH&exchanges=binance,kraken` | Latest price per (asset, exchange) with `24h_change_percent`, `volume_24h_usd`, `signal_quality` (freshness 0-100) |
+| `GET /alerts?severity=high,critical&asset=BTC&alert_type=price_anomaly&acknowledged=false&hours=24&limit=50&offset=0` | Anomaly alerts (`price_anomaly`, `volume_spike`, `coordination`, `liquidation`) with `intelligence_summary` and `confidence_score` |
+| `POST /alerts/{id}/acknowledge` `{"acknowledged_by": "...", "notes": "..."}` | Acknowledge an alert (audited) |
+| `GET /coordination?asset=BTC&status=flagged&min_confidence=0.6` | Cross-exchange coordination events with `analyst_assessment` |
+| `PATCH /coordination/{id}` `{"investigation_status": "investigating", "analyst_notes": "..."}` | Update investigation status / notes (audited) |
+| `GET /history/{asset}?hours=6&timeframe=1m&exchanges=binance,kraken` | Candles pivoted by exchange + `composite`; `timeframe` in `1m,5m,15m,1h,4h,1d` is resampled server-side; includes `anomalies_in_period` |
+| `GET /volatility/{asset}?hours=24&window_minutes=15` | Realised volatility per exchange (daily / annualised), `clusters` of sustained high volatility, rolling `series` |
+| `POST /config` `{"assets": ["BTC","ETH","SOL"], "price_anomaly_sigma": 2.5}` | Patch the `market` section of the configuration (audited; bots pick it up on their next run) |
+| `GET /status` | Bot runtime: last fetch, per-pair counts, candles stored, open alerts, liquidation stream state |
 
-Latest stored price per (asset, exchange). Empty until the market bot
-(Phase 2) writes candles.
-
-```json
-{ "timestamp": "2026-09-14T21:58:01Z", "data": [
-  { "asset": "BTC", "exchange": "binance", "price": 42150.5, "24h_change_percent": null,
-    "timestamp": "2026-09-14T21:57:00Z", "volume_24h_usd": null, "signal_quality": null }
-] }
-```
-
-Phase 2 adds: `GET /alerts`, `GET /coordination`, `GET /history/{asset}`,
-`GET /volatility/{asset}`, `POST /config`.
+Alert `severity` is derived from magnitude: price anomalies by sigma
+(3/4/5/7), volume spikes by multiplier (2/3/5/10), liquidation cascades by
+total notional ($1M/$5M/$20M/$100M), coordination by confidence.
 
 ## Maritime (`/api/maritime`)
 

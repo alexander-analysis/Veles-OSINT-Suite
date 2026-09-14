@@ -53,6 +53,7 @@ class MarketAlert(Base):
     acknowledged_at = Column(DateTime)
     notes = Column(String(500))  # analyst notes
     confidence_score = Column(Float)  # 0.0-1.0
+    summary = Column(String(300))  # machine-generated intelligence summary
 
     __table_args__ = (Index("ix_market_alerts_asset_timestamp", "asset", "timestamp"),)
 
@@ -72,6 +73,7 @@ class CoordinationEvent(Base):
     detected_at = Column(DateTime, nullable=False, index=True, default=utcnow)
     investigation_status = Column(String(50), default="flagged")  # flagged, investigating, cleared, escalated
     analyst_notes = Column(String(500))
+    summary = Column(String(300))  # machine-generated assessment
 
     __table_args__ = (Index("ix_coordination_events_asset_detected", "asset", "detected_at"),)
 
@@ -93,3 +95,4 @@ class LiquidationCascade(Base):
     detected_at = Column(DateTime, default=utcnow, nullable=False)
     correlation_score = Column(Float)  # correlation to an external event
     external_event = Column(String(300))  # sanctions announcement, geopolitical event, ...
+    summary = Column(String(300))

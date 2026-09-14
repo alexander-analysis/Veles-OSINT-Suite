@@ -7,8 +7,10 @@ OFAC, EU and UN sanctions lists, with evasion detection and an immutable audit
 trail). Runs 24/7 on a Raspberry Pi 5 and is reachable remotely through a
 Cloudflare Tunnel.
 
-**Status: Phase 1 (foundation) complete** - backend, schema, frontend shell
-and deployment tooling. Phase 2 (market bot) is next. See
+**Status: Phase 2 (market intelligence) complete** - live candles from
+Binance, Kraken, Coinbase and Yahoo Finance commodities; 3-sigma price
+anomalies, volume spikes, cross-exchange coordination and liquidation-cascade
+detection; market dashboard. Phase 3 (maritime) is next. See
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the roadmap.
 
 ## Quick start
