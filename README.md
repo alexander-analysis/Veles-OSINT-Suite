@@ -1,2 +1,2 @@
-# OSINT bots
+# Veles
 Osint workflow bot
