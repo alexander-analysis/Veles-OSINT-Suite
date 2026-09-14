@@ -1,0 +1,49 @@
+# VELES default configuration - thresholds, cadences and monitored assets.
+# Runtime changes made through POST /api/admin/config are stored in
+# settings.local.yaml (git-ignored) and merged over these defaults.
+# Secrets (API keys) do NOT belong here - they live in .env.
+
+market:
+  assets: [BTC, ETH]
+  exchanges: [binance, kraken, coinbase]
+  # yfinance tickers: gold, WTI crude, copper
+  commodities: ["GC=F", "CL=F", "HG=F"]
+  candle_timeframe: "1m"
+  fetch_interval_seconds: 60
+  analysis_interval_minutes: 5
+  volatility_interval_minutes: 15
+  # Price anomaly: deviation > N sigma from the rolling baseline
+  price_anomaly_sigma: 3.0
+  price_baseline_days: 7
+  # Volume spike: volume > N x the 24h average
+  volume_spike_multiplier: 2.0
+  # Coordination: correlated move on 2+ exchanges inside the window
+  coordination_window_seconds: 30
+  coordination_min_correlation: 0.85
+  coordination_min_move_percent: 2.0
+
+maritime:
+  ais_poll_interval_seconds: 30
+  sanctions_check_interval_minutes: 15
+  sanctions_refresh_hour_utc: 3
+  port_data_refresh_hours: 6
+  ais_sources:
+    - { type: marinetraffic, enabled: true }
+    - { type: ais_hub, enabled: true, fallback: true }
+    - { type: rtl_sdr, enabled: false, antenna_gain: 45 }
+  # Confidence thresholds (brief section 17)
+  min_visible_confidence: 0.6
+  review_queue_min_confidence: 0.4
+  transshipment_proximity_meters: 500
+  transshipment_min_duration_minutes: 30
+  ais_gap_threshold_hours: 6
+  unusual_dwell_time_hours: 72
+
+retention:
+  market_candles_days: 90
+  vessel_positions_days: 180
+  vessel_positions_compress_after_days: 7
+  purge_hour_utc: 2
+
+classification:
+  banner: UNCLASSIFIED

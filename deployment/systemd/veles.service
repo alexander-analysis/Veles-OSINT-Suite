@@ -1,0 +1,22 @@
+# VELES OSINT Platform - systemd unit.
+# pi-setup.sh substitutes the user and repository path before installing this
+# to /etc/systemd/system/veles.service.
+[Unit]
+Description=VELES OSINT Intelligence Platform
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/veles-osint/backend
+Environment="PATH=/home/pi/veles-osint/backend/venv/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="PYTHONUNBUFFERED=1"
+ExecStart=/home/pi/veles-osint/backend/venv/bin/python run.py
+Restart=always
+RestartSec=10
+# Give the bots a chance to finish an in-flight fetch on stop
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target
