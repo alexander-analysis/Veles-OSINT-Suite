@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app import __version__
-from app.api import admin, health, maritime, market, sanctions
+from app.api import admin, health, maritime, market, sanctions, stream
 from app.bots.scheduler import start_scheduler, stop_scheduler
 from app.config import BACKEND_DIR, settings
 from app.database import DATABASE_URL, init_db
@@ -23,6 +23,7 @@ from app.utils.logger import logger
 async def lifespan(_app: FastAPI):
     logger.info("VELES {} starting ({}) - database {}", __version__, settings.ENVIRONMENT, DATABASE_URL.render_as_string(hide_password=True))
     init_db()
+    stream.manager.bind_loop()
     if settings.SCHEDULER_ENABLED:
         start_scheduler()
     else:
@@ -51,6 +52,7 @@ app.add_middleware(
 app.include_router(health.router, prefix="/api")
 app.include_router(market.router, prefix="/api/market")
 app.include_router(maritime.router, prefix="/api/maritime")
+app.include_router(stream.router, prefix="/api/maritime")
 app.include_router(sanctions.router, prefix="/api/sanctions")
 app.include_router(admin.router, prefix="/api/admin")
 

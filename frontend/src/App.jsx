@@ -6,6 +6,8 @@ import Dashboard from './pages/Dashboard';
 import MarketAnalysis from './pages/MarketAnalysis';
 import Maritime from './pages/Maritime';
 import Sanctions from './pages/Sanctions';
+import VesselDetail from './pages/VesselDetail';
+import AuditLogPage from './pages/AuditLogPage';
 import Settings from './pages/Settings';
 
 function App() {
@@ -20,6 +22,8 @@ function App() {
               <Route path="/" element={<Dashboard />} />
               <Route path="/market" element={<MarketAnalysis />} />
               <Route path="/maritime" element={<Maritime />} />
+              <Route path="/maritime/vessel/:mmsi" element={<VesselDetail />} />
+              <Route path="/audit" element={<AuditLogPage />} />
               <Route path="/sanctions" element={<Sanctions />} />
               <Route path="/settings" element={<Settings />} />
             </Routes>

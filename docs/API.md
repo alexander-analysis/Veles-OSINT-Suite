@@ -46,28 +46,39 @@ total notional ($1M/$5M/$20M/$100M), coordination by confidence.
 
 ## Maritime (`/api/maritime`)
 
-### `GET /api/maritime/vessels?bbox=-180,-90,180,90&risk_filter=all&limit=5000`
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /vessels?bbox=-180,-90,180,90&risk_filter=all|flagged|breach&max_age_hours=24` | GeoJSON FeatureCollection of current positions (`marker_color`: clear `#2ecc71`, flagged `#f39c12`, breach `#e74c3c`) |
+| `GET /vessels/table?q=&flag=&status=&min_risk=&sort=risk|recent|name&limit=&offset=` | Searchable vessel grid |
+| `GET /vessel/{mmsi}` | Full profile: identity + history, sanctions matches, port history, evasion events, transshipments, zone events, position timeline, correlated vessels, audit history, risk factors |
+| `GET /vessel-correlation/{mmsi}?days=30` | Linked vessels (shared owner/operator/beneficial owner, shared designated entity, STS partners, shared high-risk ports) with link strength |
+| `GET /fleets?min_size=2` | Vessel groups sharing a declared owner/operator |
+| `GET /breaches?authority=&severity=&status=&breach_type=&min_confidence=` | Sanctions matches; `status` defaults to open (`flagged,investigating,escalated`), use `review` for the low-confidence queue or `all` |
+| `GET /breaches/{authority}` | All matches for OFAC / EU / UN |
+| `PATCH /breach/{id}` `{"investigation_status": "investigating|cleared|escalated", "analyst_notes": "..."}` | Audited status change; clearing recomputes the vessel status and risk |
+| `GET /evasion-patterns?event_type=&severity=&hours=` / `PATCH /evasion-patterns/{id}` | AIS gaps, renames, re-flagging, IMO conflicts, dark vessels |
+| `GET /transshipment?hours=&min_confidence=` / `PATCH /transshipment/{id}` | Ship-to-ship rendezvous candidates |
+| `GET /port-calls?hours=&port=&risk=&only_flagged=&open_only=` and `GET /port-calls/{24h|7d|30d}` | Port calls with dwell times and flags (`sanctioned_facility`, `unusual_dwell_time`, ...) plus per-port totals |
+| `GET /ports` | Curated port reference as GeoJSON |
+| `GET /sanctions-zones` | Monitoring zones as GeoJSON, grouped `ofac` / `eu` / `un` / `other` / `all` |
+| `GET /shipping-lanes` / `GET /shipping-lanes/violations?hours=&context=` | Lanes/chokepoints GeoJSON; zone entries and chokepoint transits by high-risk vessels |
+| `GET /audit-log?start_date=&end_date=&action_type=&vessel_id=&user=&limit=&offset=` | Immutable compliance log; `GET /audit-log/actions` lists action types |
+| `POST /audit-log/export` `{"format": "json|csv", "action_type": ..., "classification": "CONFIDENTIAL"}` | Export (audited); `pdf` arrives in Phase 4 |
+| `GET /status` | Bot status: sources, source errors (missing keys), last poll, counts, stream clients |
+| `WS /stream` | Frames: `hello`, `vessel_positions` (batched after every poll), `breach_detected`, `transshipment_detected` |
 
-Current vessel positions as a GeoJSON `FeatureCollection`. `risk_filter` is
-`all` | `flagged` | `breach`. `bbox` is `min_lon,min_lat,max_lon,max_lat`
-(422 if malformed).
+## Sanctions (`/api/sanctions`)
 
-```json
-{ "type": "FeatureCollection", "timestamp": "2026-09-14T21:58:01Z",
-  "vessel_count": 1, "breach_count": 0,
-  "features": [ { "type": "Feature",
-    "geometry": { "type": "Point", "coordinates": [2.3522, 48.8566] },
-    "properties": { "mmsi": "123456789", "imo": "9876543", "name": "Example", "flag": "PA",
-      "owner": null, "ship_type": "Tanker", "speed": 12.5, "heading": 45.0,
-      "sanctioned_status": "clear", "risk_score": null, "last_update": "2026-09-14T21:50:00Z",
-      "ais_source": "ais_hub", "marker_color": "#2ecc71" } } ] }
-```
-
-Marker colours: clear `#2ecc71`, flagged `#f39c12`, breach `#e74c3c`.
-
-Phase 3 adds: `GET /vessel/{mmsi}`, `GET /breaches`, `GET /evasion-patterns`,
-`GET /transshipment`, `GET /audit-log`, `POST /audit-log/export`,
-`WS /stream`.
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /entities?query=&type=&authority=&program=&active=&limit=&offset=` | Search listings by name / alias / IMO / MMSI with cross-authority `designating_authorities` |
+| `GET /entities/{id}` | One listing |
+| `POST /check-entity` `{"entity_name": "...", "entity_type": "company", "min_similarity": 0.85}` | Screen a name (audited as `sanctions_check`) |
+| `GET /vessel/{mmsi}` | Recorded breaches + live screen + recommendation |
+| `GET /updates?timeframe=7&authority=&type=` | Change log since the last refreshes with per-authority summary |
+| `GET /programs?authority=` | Programme counts |
+| `GET /report/{7days|30days|24h}` | JSON activity report |
+| `GET /status` / `POST /refresh?authority=OFAC,EU` | Bot status; trigger a refresh (202) |
 
 ## Admin (`/api/admin`)
 

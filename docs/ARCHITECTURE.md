@@ -42,10 +42,11 @@ Nginx (static frontend + /api proxy + WebSocket)  <--  Cloudflare Tunnel  <--  a
 | `database.py` | Engine (SQLite WAL, `check_same_thread=False`), `SessionLocal`, `Base`, `init_db()` (Alembic upgrade at startup). |
 | `models/` | SQLAlchemy models: `market.py`, `maritime.py`, `sanctions.py`, `audit.py`. |
 | `schemas/` | Pydantic response models; datetimes render as ISO-8601 with `Z`. |
-| `api/` | Routers: `health`, `market`, `maritime`, `admin`. Mounted in `main.py`. |
-| `bots/` | `scheduler.py` (APScheduler) + bot cores (`market.py` Phase 2, `maritime.py` Phase 3). |
-| `analysis/` | Pure analysis functions (anomaly, coordination, sanctions matching, evasion, transshipment). |
-| `integrations/` | External clients (exchanges via ccxt, AIS providers, sanctions list importers). |
+| `api/` | Routers: `health`, `market`, `maritime`, `sanctions`, `admin`, `stream` (WebSocket). Mounted in `main.py`. |
+| `data/` | Bundled reference data: ports, zones/lanes, MID table, country names. |
+| `bots/` | `runtime.py` (dedicated asyncio loop), `scheduler.py` (APScheduler), `market.py`, `sanctions.py`, `maritime.py`. |
+| `analysis/` | Pure analysis: `market_anomaly`, `coordination`, `liquidation`, `sanctions` (index + rules), `evasion`, `transshipment`, `ports`, `geospatial`, `correlation`, `risk`. |
+| `integrations/` | ccxt exchanges, Binance liquidation stream, yfinance; AIS: Digitraffic, aisstream, MarineTraffic, AISHub, NMEA/UDP; OFAC/EU/UN importers; OpenWeatherMap. |
 | `utils/` | `logger` (loguru, rotating files), `time` (naive-UTC helpers), `config_store` (settings.yaml + overrides). |
 
 ## Conventions
@@ -70,5 +71,6 @@ Nginx (static frontend + /api proxy + WebSocket)  <--  Cloudflare Tunnel  <--  a
 |-------|-------|--------|
 | 1 | Foundation: schema, API skeleton, frontend shell, deployment config | done |
 | 2 | Market bot: exchange ingestion, 3-sigma anomalies, volume spikes, coordination, liquidation cascades, market dashboard | done |
-| 3 | Maritime bot: AIS ingestion, OFAC/EU/UN screening, evasion/transshipment, map, breach board, audit log UI, WebSocket | next |
-| 4 | Polish: exports (PDF/JSON/CSV), settings editor, CI, hardening | planned |
+| 2.5 | Sanctions bot: OFAC/EU/UN import + diffing, screening index, entity search/check, updates timeline | done |
+| 3 | Maritime bot: AIS ingestion, OFAC/EU/UN screening, evasion/transshipment/ports/zones, map, breach board, audit log UI, WebSocket | done |
+| 4 | Polish: PDF reports, settings editor, alerts/digests, CI, hardening | next |

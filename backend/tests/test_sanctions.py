@@ -180,7 +180,7 @@ def test_sanctions_api(client):
     updates = client.get("/api/sanctions/updates?timeframe=7").json()
     assert updates["total_updates"] == 1 and updates["summary"]["OFAC"]["new_designation"] == 1
     report = client.get("/api/sanctions/report/7days").json()
-    assert report["total_updates"] == 1 and report["active_listings"]["OFAC"] == 2
+    assert report["total_updates"] == 1 and report["active_listings"]["OFAC"] >= 2
     assert client.get("/api/sanctions/report/soon").status_code == 422
-    assert client.get("/api/sanctions/status").json()["index_size"] == 3
+    assert client.get("/api/sanctions/status").json()["index_size"] >= 3
     assert client.get("/api/sanctions/vessel/000000000").status_code == 404

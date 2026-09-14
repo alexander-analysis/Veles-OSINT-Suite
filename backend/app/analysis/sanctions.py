@@ -3,8 +3,9 @@
 Confidence ladder (brief section 17):
 
 * IMO / MMSI match on a listed vessel                      0.95  direct_match
-* Exact (normalised) vessel-name match                     0.90  direct_match
-* Fuzzy vessel-name match (0.55; 0.70 if the flag agrees)        direct_match
+* Exact vessel-name match (flag agrees / unknown / differs) 0.90 / 0.80 / 0.55
+* Fuzzy vessel-name match (flag agrees / unknown / differs) 0.70 / 0.50 / 0.35
+* ... capped at 0.30 when both IMO numbers are known and differ (namesake)
 * Owner / operator matches a listed company (+0.05 flag)   0.60  owner_match
 * Beneficial owner matches a listed entity                 0.40  owner_match (review queue)
 * Flag state under a comprehensive programme (IR/KP/SY/CU) 0.80  flag_violation
@@ -171,11 +172,12 @@ class SanctionsIndex:
             for entity_id in self.by_mmsi.get(str(vessel.mmsi), []):
                 add(self._match(self.entities[entity_id], "mmsi", str(vessel.mmsi), 0.95, "direct_match"))
         if getattr(vessel, "name", None):
+            vessel_imo = getattr(vessel, "imo", None)
             for entity in self.exact(vessel.name, {"vessel"}):
-                confidence = 0.9 if not entity.vessel_flag or entity.vessel_flag == flag else 0.75
+                confidence = self._name_confidence(entity, flag, vessel_imo, vessel.name, exact=True)
                 add(self._match(entity, "name_exact", vessel.name, confidence, "direct_match", similarity=1.0))
             for entity, score in self.fuzzy(vessel.name, {"vessel"}, fuzzy_min_similarity):
-                confidence = 0.7 if entity.vessel_flag and entity.vessel_flag == flag else 0.55
+                confidence = self._name_confidence(entity, flag, vessel_imo, vessel.name, exact=False)
                 add(self._match(entity, "name_fuzzy", vessel.name, confidence, "direct_match", similarity=round(score, 3)))
         for attribute, match_type, base in (("owner_name", "owner", 0.6), ("registered_operator", "operator", 0.6), ("beneficial_owner", "beneficial_owner", 0.4)):
             value = getattr(vessel, attribute, None)
@@ -202,6 +204,28 @@ class SanctionsIndex:
             )
         matches.sort(key=lambda m: m.confidence, reverse=True)
         return matches
+
+    @staticmethod
+    def _name_confidence(entity: IndexedEntity, flag: str | None, vessel_imo: str | None, name: str, exact: bool) -> float:
+        """Name matches are weak on their own: flags and (above all) IMO numbers decide.
+
+        * listed flag agrees        exact 0.90 / fuzzy 0.70
+        * listed flag unknown       exact 0.80 / fuzzy 0.50
+        * listed flag differs       exact 0.55 / fuzzy 0.35  (review queue)
+        * both IMOs known, differ   capped at 0.30  (a namesake, not the designated hull)
+        * no IMO and a short name   capped at 0.50  (common names on small craft)
+        """
+        if entity.vessel_flag and entity.vessel_flag == flag:
+            confidence = 0.9 if exact else 0.7
+        elif not entity.vessel_flag:
+            confidence = 0.8 if exact else 0.5
+        else:
+            confidence = 0.55 if exact else 0.35  # review queue: same name, different flag, no IMO to decide
+        if entity.imo and vessel_imo and entity.imo != vessel_imo:
+            confidence = min(confidence, 0.3)
+        elif not vessel_imo and len(normalize_name(name)) <= 6:
+            confidence = min(confidence, 0.5)
+        return round(confidence, 2)
 
     @staticmethod
     def _match(entity: IndexedEntity, match_type: str, value: str, confidence: float, breach_type: str, similarity: float | None = None) -> Match:

@@ -7,11 +7,13 @@ OFAC, EU and UN sanctions lists, with evasion detection and an immutable audit
 trail). Runs 24/7 on a Raspberry Pi 5 and is reachable remotely through a
 Cloudflare Tunnel.
 
-**Status: Phase 2 (market intelligence) complete** - live candles from
-Binance, Kraken, Coinbase and Yahoo Finance commodities; 3-sigma price
-anomalies, volume spikes, cross-exchange coordination and liquidation-cascade
-detection; market dashboard. Phase 3 (maritime) is next. See
-[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the roadmap.
+**Status: Phase 3 (maritime intelligence) complete** - live AIS tracking
+(Digitraffic keyless; aisstream.io / MarineTraffic / AISHub / RTL-SDR with
+credentials), OFAC / EU / UN sanctions screening with an audited breach board,
+AIS-gap / rename / re-flag / identity-conflict detection, ship-to-ship
+rendezvous, port intelligence, zone & chokepoint monitoring, entity linkage,
+WebSocket live map and an immutable audit log with JSON/CSV export. Phase 4
+(polish & production) is next. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Quick start
 
@@ -37,7 +39,7 @@ Or build once (`npm run build`) and let the backend serve the UI at
 backend/      FastAPI app - app/{api,models,schemas,bots,analysis,integrations,utils}, Alembic migrations, tests
 frontend/     React 18 + Vite + Tailwind (light, agency-style theme)
 deployment/   nginx.conf, systemd unit, pi-setup.sh, Cloudflare Tunnel guide
-docs/         ARCHITECTURE.md, API.md, DEPLOYMENT.md
+docs/         ARCHITECTURE.md, API.md, DEPLOYMENT.md, DATA_SOURCES.md
 ```
 
 ## Stack

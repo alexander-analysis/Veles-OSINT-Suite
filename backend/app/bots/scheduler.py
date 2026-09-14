@@ -9,6 +9,7 @@ Cadences are read from ``settings.yaml`` when the scheduler starts; thresholds
 are re-read by the bots on every run.
 """
 
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -160,6 +161,31 @@ def _weekly_sanctions_report() -> None:
     log.info("weekly sanctions report written to {}", path)
 
 
+def register_maritime_jobs() -> None:
+    from app.bots.maritime import maritime_bot
+
+    cfg = config_store.get_config()
+    maritime = cfg.get("maritime", {})
+    sanctions = cfg.get("sanctions", {})
+    retention = cfg.get("retention", {})
+    scheduler.add_job(_on_loop(maritime_bot.fetch_ais_positions, timeout=120), "interval", seconds=int(maritime.get("ais_poll_interval_seconds", 30)), id="maritime.fetch_ais", replace_existing=True)
+    # First screening pass ~2 minutes after boot (the list import/index build takes ~20 s), then every N minutes
+    scheduler.add_job(
+        _on_loop(maritime_bot.check_sanctions, timeout=600),
+        "interval",
+        minutes=int(maritime.get("sanctions_check_interval_minutes", 15)),
+        next_run_time=datetime.now(timezone.utc) + timedelta(seconds=120),
+        id="maritime.check_sanctions",
+        replace_existing=True,
+    )
+    scheduler.add_job(_on_loop(maritime_bot.detect_transshipments, timeout=300), "interval", minutes=5, id="maritime.detect_transshipments", replace_existing=True)
+    scheduler.add_job(_on_loop(maritime_bot.detect_port_calls, timeout=300), "interval", minutes=5, id="maritime.detect_port_calls", replace_existing=True)
+    scheduler.add_job(_on_loop(maritime_bot.detect_dark_vessels, timeout=300), "interval", minutes=15, id="maritime.detect_dark_vessels", replace_existing=True)
+    scheduler.add_job(_on_loop(maritime_bot.update_risk_scores, timeout=600), "interval", minutes=int(sanctions.get("check_maritime_interval_minutes", 30)), id="maritime.update_risk_scores", replace_existing=True)
+    scheduler.add_job(_on_loop(maritime_bot.cleanup_old_data, timeout=1800), "cron", hour=int(retention.get("purge_hour_utc", 2)), minute=30, id="maritime.cleanup_old_data", replace_existing=True)
+    scheduler.add_job(_on_loop(maritime_bot.fetch_ais_positions, timeout=120), id="maritime.initial_fetch", replace_existing=True)
+
+
 def start_scheduler() -> BackgroundScheduler:
     """Register the standing jobs and start the scheduler (idempotent)."""
     if scheduler.running:
@@ -168,6 +194,7 @@ def start_scheduler() -> BackgroundScheduler:
     scheduler.add_job(_heartbeat, "interval", minutes=5, id="heartbeat", replace_existing=True)
     register_market_jobs()
     register_sanctions_jobs()
+    register_maritime_jobs()
     scheduler.start()
     log.info("started with {} job(s)", len(scheduler.get_jobs()))
     return scheduler
@@ -178,12 +205,14 @@ def stop_scheduler() -> None:
         scheduler.shutdown(wait=False)
         log.info("stopped")
     if bot_loop.running:
+        from app.bots.maritime import maritime_bot
         from app.bots.market import market_bot
 
-        try:
-            bot_loop.run(market_bot.close(), timeout=10)
-        except Exception:  # noqa: BLE001
-            pass
+        for bot in (market_bot, maritime_bot):
+            try:
+                bot_loop.run(bot.close(), timeout=10)
+            except Exception:  # noqa: BLE001
+                pass
         bot_loop.stop()
 
 

@@ -35,10 +35,16 @@ maritime:
   sanctions_check_interval_minutes: 15
   sanctions_refresh_hour_utc: 3
   port_data_refresh_hours: 6
+  # AIS sources (see docs/DATA_SOURCES.md). Key-gated sources stay off until
+  # their credential is present in .env even when enabled here.
   ais_sources:
-    - { type: marinetraffic, enabled: true }
-    - { type: ais_hub, enabled: true, fallback: true }
-    - { type: rtl_sdr, enabled: false, antenna_gain: 45 }
+    - { type: digitraffic, enabled: true }          # Baltic / Finland, no key
+    - { type: aisstream, enabled: true }            # global, AISSTREAM_API_KEY
+    - { type: marinetraffic, enabled: false }       # MARINETRAFFIC_API_KEY (+ optional bbox [min_lat, min_lon, max_lat, max_lon])
+    - { type: ais_hub, enabled: false }             # AISHUB_USERNAME
+    - { type: rtl_sdr, enabled: false, udp_port: 10110 }  # local rtl_ais / AIS-catcher NMEA over UDP
+  max_position_age_minutes: 30
+  transshipment_max_speed_knots: 1.5
   # Confidence thresholds (brief section 17)
   min_visible_confidence: 0.6
   review_queue_min_confidence: 0.4

@@ -1,0 +1,164 @@
+"""Sanctions-evasion indicators derived from AIS behaviour and identity changes.
+
+All functions are pure: they take the stored vessel state plus the incoming
+report and return ``EvasionIndicator`` records for the bot to persist.
+"""
+
+from dataclasses import dataclass, field
+from datetime import datetime
+
+from app.analysis.geospatial import describe_location, zones_containing
+
+HIGH_RISK_KINDS = {"sanctions_zone", "war_zone"}
+
+
+@dataclass
+class EvasionIndicator:
+    event_type: str  # ais_gap, name_change, flag_change, identity_conflict, dark_in_zone
+    severity: str
+    confidence: float
+    timestamp: datetime
+    summary: str
+    lat: float | None = None
+    lon: float | None = None
+    details: dict = field(default_factory=dict)
+
+
+def _risk_context(lat: float | None, lon: float | None) -> list[str]:
+    if lat is None or lon is None:
+        return []
+    return [z.name for z in zones_containing(lat, lon) if z.kind in HIGH_RISK_KINDS]
+
+
+def detect_ais_gap(
+    previous_time: datetime | None,
+    previous_speed: float | None,
+    previous_lat: float | None,
+    previous_lon: float | None,
+    position,
+    threshold_hours: float = 6.0,
+) -> EvasionIndicator | None:
+    """A gap longer than ``threshold_hours`` while the vessel was last seen underway.
+
+    Severity rises when either end of the gap lies in a sanctions/war zone -
+    'going dark' near restricted waters is the classic evasion signature.
+    """
+    if previous_time is None:
+        return None
+    gap_hours = (position.timestamp - previous_time).total_seconds() / 3600
+    if gap_hours < threshold_hours:
+        return None
+    was_underway = (previous_speed or 0) >= 1.0
+    zones_before = _risk_context(previous_lat, previous_lon)
+    zones_after = _risk_context(position.lat, position.lon)
+    in_zone = bool(zones_before or zones_after)
+    if in_zone and gap_hours >= threshold_hours * 4:
+        severity, confidence = "critical", 0.85
+    elif in_zone:
+        severity, confidence = "high", 0.7
+    elif was_underway and gap_hours >= threshold_hours * 4:
+        severity, confidence = "high", 0.6
+    elif was_underway:
+        severity, confidence = "medium", 0.45
+    else:
+        severity, confidence = "low", 0.25  # moored/anchored vessels legitimately stop transmitting
+    where = describe_location(position.lat, position.lon)
+    return EvasionIndicator(
+        event_type="ais_gap",
+        severity=severity,
+        confidence=confidence,
+        timestamp=position.timestamp,
+        lat=position.lat,
+        lon=position.lon,
+        summary=f"AIS silent for {gap_hours:.1f} h; reappeared {where}" + (f" - zones: {', '.join(zones_before + zones_after)}" if in_zone else ""),
+        details={
+            "gap_hours": round(gap_hours, 2),
+            "last_seen": previous_time.isoformat(),
+            "last_speed": previous_speed,
+            "was_underway": was_underway,
+            "start": {"lat": previous_lat, "lon": previous_lon},
+            "end": {"lat": position.lat, "lon": position.lon},
+            "zones_before": zones_before,
+            "zones_after": zones_after,
+        },
+    )
+
+
+def detect_identity_changes(vessel, position) -> list[EvasionIndicator]:
+    """Name / flag changes on the same MMSI, and IMO reported under a new name."""
+    indicators = []
+    if position.name and vessel.name and position.name.upper() != vessel.name.upper() and not vessel.name.startswith("MMSI "):
+        indicators.append(
+            EvasionIndicator(
+                event_type="name_change",
+                severity="medium",
+                confidence=0.5,
+                timestamp=position.timestamp,
+                lat=position.lat,
+                lon=position.lon,
+                summary=f"Vessel renamed from '{vessel.name}' to '{position.name}'",
+                details={"old_name": vessel.name, "new_name": position.name},
+            )
+        )
+    if position.flag and vessel.flag_state and position.flag != vessel.flag_state and position.flag != "XX":
+        indicators.append(
+            EvasionIndicator(
+                event_type="flag_change",
+                severity="high",
+                confidence=0.6,
+                timestamp=position.timestamp,
+                lat=position.lat,
+                lon=position.lon,
+                summary=f"Flag changed from {vessel.flag_state} to {position.flag}",
+                details={"old_flag": vessel.flag_state, "new_flag": position.flag},
+            )
+        )
+    return indicators
+
+
+def identity_conflict(existing_vessel, position) -> EvasionIndicator:
+    """The reported IMO already belongs to a vessel with a different MMSI (re-registration or spoofing)."""
+    flag_changed = existing_vessel.flag_state != position.flag
+    return EvasionIndicator(
+        event_type="identity_conflict",
+        severity="high" if flag_changed else "medium",
+        confidence=0.65 if flag_changed else 0.5,
+        timestamp=position.timestamp,
+        lat=position.lat,
+        lon=position.lon,
+        summary=(
+            f"IMO {position.imo} now transmitting as MMSI {position.mmsi} ({position.name or 'unnamed'}, {position.flag}); "
+            f"previously MMSI {existing_vessel.mmsi} ({existing_vessel.name}, {existing_vessel.flag_state})"
+        ),
+        details={
+            "imo": position.imo,
+            "previous_mmsi": existing_vessel.mmsi,
+            "previous_name": existing_vessel.name,
+            "previous_flag": existing_vessel.flag_state,
+            "new_mmsi": position.mmsi,
+            "new_name": position.name,
+            "new_flag": position.flag,
+        },
+    )
+
+
+def dark_vessel_indicator(vessel, now: datetime, threshold_hours: float) -> EvasionIndicator | None:
+    """A flagged/breach vessel that stopped transmitting inside or near a monitored zone."""
+    if not vessel.last_ais_update or vessel.current_position_lat is None:
+        return None
+    hours = (now - vessel.last_ais_update).total_seconds() / 3600
+    if hours < threshold_hours:
+        return None
+    zones = _risk_context(vessel.current_position_lat, vessel.current_position_lon)
+    if not zones and not (vessel.sanctioned_status or "clear").startswith("breach"):
+        return None
+    return EvasionIndicator(
+        event_type="dark_in_zone" if zones else "dark_vessel",
+        severity="high" if zones else "medium",
+        confidence=0.6 if zones else 0.4,
+        timestamp=vessel.last_ais_update,
+        lat=vessel.current_position_lat,
+        lon=vessel.current_position_lon,
+        summary=f"{vessel.name} ({vessel.sanctioned_status}) silent for {hours:.1f} h, last seen {describe_location(vessel.current_position_lat, vessel.current_position_lon)}",
+        details={"hours_silent": round(hours, 1), "zones": zones, "sanctioned_status": vessel.sanctioned_status},
+    )
