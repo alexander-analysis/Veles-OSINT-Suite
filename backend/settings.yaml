@@ -47,6 +47,18 @@ maritime:
   ais_gap_threshold_hours: 6
   unusual_dwell_time_hours: 72
 
+sanctions:
+  # OFAC / EU / UN list refresh cadence (hours); lists are also loaded at first start
+  refresh_interval_hours: 6
+  refresh_on_startup: true
+  # Re-screen recently active vessels this often (minutes)
+  check_maritime_interval_minutes: 30
+  # Weekly JSON activity report written to backend/reports/ (UTC, 0 = Monday)
+  weekly_report_day: 0
+  weekly_report_hour_utc: 9
+  # Fuzzy vessel-name similarity floor (0-1)
+  fuzzy_min_similarity: 0.9
+
 retention:
   market_candles_days: 90
   vessel_positions_days: 180

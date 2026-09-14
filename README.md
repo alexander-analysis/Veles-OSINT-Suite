@@ -49,7 +49,7 @@ Tunnel.
 ## Deploying to a Pi
 
 ```bash
-git clone https://github.com/alexander-analysis/OSINT-bots.git ~/veles-osint
+git clone https://github.com/alexander-analysis/Veles-OSINT-Suite.git ~/veles-osint
 cd ~/veles-osint && bash deployment/pi-setup.sh
 ```
 

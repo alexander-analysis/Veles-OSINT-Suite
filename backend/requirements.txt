@@ -28,6 +28,8 @@ scipy>=1.14
 geopy>=2.4
 pyproj>=3.7
 shapely>=2.0
+pyais>=2.6  # NMEA/AIS decoding (RTL-SDR, AIS-catcher, NMEA feeds)
+websockets>=13
 
 # Task scheduling (4.x is a rewrite with a different API - stay on 3.x)
 APScheduler>=3.10,<4

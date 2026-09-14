@@ -32,7 +32,7 @@ Tested target: Raspberry Pi OS 64-bit (Bookworm = Python 3.11, Trixie = 3.13).
 
 ```bash
 sudo apt-get install -y git
-git clone https://github.com/alexander-analysis/OSINT-bots.git ~/veles-osint
+git clone https://github.com/alexander-analysis/Veles-OSINT-Suite.git ~/veles-osint
 cd ~/veles-osint
 bash deployment/pi-setup.sh
 ```

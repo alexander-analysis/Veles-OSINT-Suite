@@ -105,6 +105,61 @@ async def _start_liquidation_stream() -> None:
     market_bot.ensure_liquidation_stream()
 
 
+def register_sanctions_jobs() -> None:
+    from app.bots.sanctions import sanctions_bot
+
+    cfg = config_store.get_config().get("sanctions", {})
+    scheduler.add_job(
+        _on_loop(sanctions_bot.update_all_sanctions, timeout=900),
+        "interval",
+        hours=int(cfg.get("refresh_interval_hours", 6)),
+        id="sanctions.refresh_lists",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        _weekly_sanctions_report,
+        "cron",
+        day_of_week=int(cfg.get("weekly_report_day", 0)),
+        hour=int(cfg.get("weekly_report_hour_utc", 9)),
+        minute=0,
+        id="sanctions.weekly_report",
+        replace_existing=True,
+    )
+    if cfg.get("refresh_on_startup", True):
+        # Load the lists right away on an empty database; otherwise just build the index
+        from app.database import SessionLocal
+        from app.models.sanctions import SanctionsEntity
+        from sqlalchemy import func, select
+
+        with SessionLocal() as db:
+            listings = db.execute(select(func.count(SanctionsEntity.id)).where(SanctionsEntity.is_active.is_(True))).scalar() or 0
+        if listings == 0:
+            scheduler.add_job(_on_loop(sanctions_bot.update_all_sanctions, timeout=900), id="sanctions.initial_refresh", replace_existing=True)
+        else:
+            scheduler.add_job(sanctions_bot.rebuild_index, id="sanctions.initial_index", replace_existing=True)
+
+
+def _weekly_sanctions_report() -> None:
+    import json
+
+    from app.bots.sanctions import sanctions_bot
+    from app.config import BACKEND_DIR
+    from app.database import SessionLocal
+    from app.models.audit import AuditLog
+    from app.utils.time import utcnow
+
+    report = sanctions_bot.generate_report(days=7)
+    reports_dir = BACKEND_DIR / "reports"
+    reports_dir.mkdir(exist_ok=True)
+    path = reports_dir / f"sanctions_weekly_{utcnow():%Y-%m-%d}.json"
+    path.write_text(json.dumps(report, default=str, indent=2), encoding="utf-8")
+    with SessionLocal() as db:
+        db.add(AuditLog(action_type="report_generated", user_id="system", rationale="Weekly sanctions activity report",
+                        supporting_data={"path": str(path), "updates": report["total_updates"]}, source_systems=["bots.sanctions"], created_by="system"))
+        db.commit()
+    log.info("weekly sanctions report written to {}", path)
+
+
 def start_scheduler() -> BackgroundScheduler:
     """Register the standing jobs and start the scheduler (idempotent)."""
     if scheduler.running:
@@ -112,6 +167,7 @@ def start_scheduler() -> BackgroundScheduler:
     bot_loop.start()
     scheduler.add_job(_heartbeat, "interval", minutes=5, id="heartbeat", replace_existing=True)
     register_market_jobs()
+    register_sanctions_jobs()
     scheduler.start()
     log.info("started with {} job(s)", len(scheduler.get_jobs()))
     return scheduler

@@ -2,5 +2,4 @@
 #   sudo apt-get install -y rtl-sdr librtlsdr-dev
 #   venv/bin/pip install -r requirements-optional.txt
 pyrtlsdr>=0.3
-pyais>=2.6
 Pillow>=10.4

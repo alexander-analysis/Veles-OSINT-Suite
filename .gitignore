@@ -8,6 +8,7 @@ __pycache__/
 venv/
 .venv/
 backend/logs/
+backend/reports/
 backend/settings.local.yaml
 
 # SQLite databases (created at runtime)

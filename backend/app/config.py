@@ -42,6 +42,10 @@ class Settings(BaseSettings):
 
     # Maritime APIs
     MARINETRAFFIC_API_KEY: str = ""
+    AISSTREAM_API_KEY: str = ""
+    AISHUB_USERNAME: str = ""
+    OPENWEATHERMAP_API_KEY: str = ""
+    RTL_AIS_UDP_PORT: int = 10110
 
     # Cloudflare Tunnel
     CLOUDFLARE_TOKEN: str = ""
@@ -50,6 +54,11 @@ class Settings(BaseSettings):
         """Return ``value`` as an absolute path, anchored at backend/ if relative."""
         path = Path(value)
         return path if path.is_absolute() else (BACKEND_DIR / path).resolve()
+
+    def key(self, name: str) -> str:
+        """Return a configured secret, treating the .env.example placeholders as unset."""
+        value = getattr(self, name, "") or ""
+        return "" if value.startswith("your_") else value
 
     @property
     def cors_origins(self) -> list[str]:

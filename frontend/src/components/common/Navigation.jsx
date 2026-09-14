@@ -1,11 +1,12 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, TrendingUp, Ship, Settings } from 'lucide-react';
+import { LayoutDashboard, TrendingUp, Ship, ShieldAlert, Settings } from 'lucide-react';
 import clsx from 'clsx';
 
 const LINKS = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/market', label: 'Market', icon: TrendingUp },
   { to: '/maritime', label: 'Maritime', icon: Ship },
+  { to: '/sanctions', label: 'Sanctions', icon: ShieldAlert },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];
 

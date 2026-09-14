@@ -7,6 +7,7 @@ autogenerate and cross-module relationships (string references) resolve.
 from app.models.audit import AuditLog, DataRetentionPolicy
 from app.models.base import Base
 from app.models.maritime import (
+    EvasionEvent,
     PortCallEvent,
     SanctionsBreach,
     ShippingLaneViolation,
@@ -15,7 +16,7 @@ from app.models.maritime import (
     VesselPosition,
 )
 from app.models.market import CoordinationEvent, LiquidationCascade, MarketAlert, MarketCandle
-from app.models.sanctions import SanctionsEntity
+from app.models.sanctions import SanctionsEntity, SanctionsProgramTracking, SanctionsUpdate
 
 __all__ = [
     "Base",
@@ -32,4 +33,7 @@ __all__ = [
     "MarketAlert",
     "MarketCandle",
     "SanctionsEntity",
+    "SanctionsProgramTracking",
+    "SanctionsUpdate",
+    "EvasionEvent",
 ]

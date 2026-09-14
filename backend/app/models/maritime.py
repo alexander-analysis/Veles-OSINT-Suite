@@ -16,6 +16,8 @@ class Vessel(UpdatedTimestampMixin, Base):
     imo = Column(String(20), unique=True, nullable=True, index=True)  # hull identity (survives renames/reflags)
     name = Column(String(200), nullable=False, index=True)  # current vessel name
     historical_names = Column(JSON)  # previous names (name-spoofing detection)
+    historical_flags = Column(JSON)  # previous flag states (re-flagging detection)
+    destination = Column(String(100))  # AIS-declared destination
     call_sign = Column(String(20), index=True)
     flag_state = Column(String(3), nullable=False, index=True)  # ISO country code
     ship_type = Column(String(100))  # Tanker, Cargo, ...
@@ -83,7 +85,8 @@ class SanctionsBreach(Base):
     flag = Column(String(3))
     breach_type = Column(String(50), nullable=False)  # direct_match, owner_match, flag_violation, transshipment, evasion
     sanctioning_authority = Column(String(20), nullable=False, index=True)  # OFAC, EU, UN
-    sanctioned_entity_name = Column(String(200), nullable=False)
+    sanctioned_entity_name = Column(String(300), nullable=False)
+    sanctioned_entity_id = Column(Integer, ForeignKey("sanctions_entities.id"), index=True)
     match_confidence = Column(Float)  # 0.0-1.0
     severity = Column(String(20), nullable=False, index=True)  # critical, high, medium
     location_lat = Column(Float)
@@ -97,6 +100,7 @@ class SanctionsBreach(Base):
     analyst_notes = Column(String(500))
 
     vessel = relationship("Vessel", back_populates="breaches")
+    sanctioned_entity = relationship("SanctionsEntity", back_populates="breaches")
     audit_entries = relationship("AuditLog", back_populates="breach")
 
     __table_args__ = (
@@ -173,3 +177,28 @@ class ShippingLaneViolation(Base):
     detected_at = Column(DateTime, default=utcnow, nullable=False)
 
     __table_args__ = (Index("ix_shipping_lane_violations_vessel_lane", "vessel_id", "lane_name"),)
+
+
+class EvasionEvent(Base):
+    """Sanctions-evasion indicator: AIS gap, flag change, name change, identity conflict, dark in zone."""
+
+    __tablename__ = "evasion_events"
+
+    id = Column(Integer, primary_key=True)
+    vessel_id = Column(Integer, ForeignKey("vessels.id"), nullable=False, index=True)
+    mmsi = Column(String(20), index=True)
+    event_type = Column(String(50), nullable=False, index=True)  # ais_gap, flag_change, name_change, identity_conflict, dark_in_zone
+    severity = Column(String(20), nullable=False)  # low, medium, high, critical
+    confidence_score = Column(Float)
+    timestamp = Column(DateTime, nullable=False, index=True)
+    location_lat = Column(Float)
+    location_lon = Column(Float)
+    details = Column(JSON)  # gap hours, old/new values, zone name, ...
+    summary = Column(String(300))
+    investigation_status = Column(String(50), default="flagged")
+    analyst_notes = Column(String(500))
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+
+    vessel = relationship("Vessel")
+
+    __table_args__ = (Index("ix_evasion_events_vessel_type_time", "vessel_id", "event_type", "timestamp"),)
