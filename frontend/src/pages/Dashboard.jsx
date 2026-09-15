@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { TrendingUp, Ship, Activity, Database, Clock, ShieldAlert, FileDown, AlertTriangle, Globe, Coins, Building2 } from 'lucide-react';
+import { TrendingUp, Ship, Activity, Database, Clock, ShieldAlert, FileDown, AlertTriangle, Globe, Coins, Building2, Fuel } from 'lucide-react';
 import PageHeader from '../components/common/PageHeader';
 import StatusBadge from '../components/common/StatusBadge';
 import LoadingSpinner from '../components/common/LoadingSpinner';
@@ -49,6 +49,7 @@ export default function Dashboard() {
   const { data: geoAlerts } = useFetch('/api/geopolitical/alerts?hours=48&limit=5', 60000);
   const { data: chain } = useFetch('/api/blockchain/summary?hours=24', 60000);
   const { data: corp } = useFetch('/api/corporate/summary', 120000);
+  const { data: energy } = useFetch('/api/energy/summary?days=7', 120000);
   const market = health?.bots?.market;
   const maritime = health?.bots?.maritime;
   const sanctions = health?.bots?.sanctions;
@@ -72,6 +73,7 @@ export default function Dashboard() {
       )}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6 mb-4">
+        <Tile icon={Fuel} title="Sanctioned oil shipments (7d)" value={energy ? energy.sanctioned_shipments : '-'} detail={energy ? `${Object.values(energy.dark_oil_indicators || {}).reduce((s, n) => s + n, 0)} dark-oil indicators - ${energy.tankers_at_facilities_now} tankers at watched facilities` : undefined} tone={energy ? (Object.values(energy.dark_oil_indicators || {}).reduce((s, n) => s + n, 0) ? 'warn' : 'ok') : undefined} to="/energy" />
         <Tile icon={Building2} title="Corporate exposure" value={corp ? corp.exposure : '-'} detail={corp ? `${corp.companies.toLocaleString()} companies - ${corp.with_lei} resolved - ${corp.shell_companies} shell indicators` : undefined} tone={corp ? (corp.exposure ? 'warn' : 'ok') : undefined} to="/corporate" />
         <Tile icon={Coins} title="Sanctioned crypto wallets" value={chain ? chain.sanctioned_wallets_total : '-'} detail={chain ? `$${Math.round(chain.sanctioned_balance_usd || 0).toLocaleString()} held - ${chain.sanctioned_wallets_active} active 24h` : undefined} tone={chain ? (chain.sanctioned_wallets_active ? 'error' : 'ok') : undefined} to="/blockchain" />
         <Tile icon={Globe} title="Geopolitical events (24h)" value={geo ? geo.total : '-'} detail={geo ? `${(geo.by_severity?.critical || 0) + (geo.by_severity?.high || 0)} high/critical - ${geo.correlations} cross-domain links` : undefined} tone={geo ? ((geo.by_severity?.critical || 0) ? 'error' : (geo.by_severity?.high || 0) ? 'warn' : 'ok') : undefined} to="/geopolitical" />

@@ -247,6 +247,10 @@ class MaritimeBot:
                     vessel.ship_type = position.ship_type
                 if position.destination:
                     vessel.destination = position.destination[:100]
+                if position.draught and 0 < position.draught < 40:
+                    vessel.draught = position.draught
+                if position.length_m and not vessel.length_m:
+                    vessel.length_m, vessel.beam_m = position.length_m, position.beam_m
                 vessel.current_position_lat, vessel.current_position_lon = position.lat, position.lon
                 vessel.current_heading, vessel.current_speed = position.heading, position.speed
                 vessel.ais_status = position.nav_status
@@ -551,6 +555,7 @@ class MaritimeBot:
                 if call is not None:
                     if port_rules.is_departure(vessel, call, state):
                         call.departure_time = vessel.last_ais_update
+                        call.draught_departure = vessel.draught
                         call.dwell_time_hours = port_rules.dwell_hours(call.arrival_time, call.departure_time)
                         port = next((p for p in PORTS if p["name"] == call.port_name), {})
                         call.flags_raised = port_rules.port_flags(port, call.dwell_time_hours, unusual, vessel)
@@ -566,6 +571,7 @@ class MaritimeBot:
                         vessel_id=vessel.id, mmsi=vessel.mmsi, port_name=port["name"], port_code=port.get("unlocode"), port_country=port.get("country"),
                         is_sanctioned_facility=bool(port.get("sanctioned_facility")), facility_risk_level=port.get("risk_level"), arrival_time=vessel.last_ais_update,
                         cargo_type_predicted=port_rules.predicted_cargo(vessel, port), flags_raised=port_rules.port_flags(port, None, unusual, vessel),
+                        draught_arrival=vessel.draught,
                     )
                     db.add(call)
                     open_calls[vessel.id] = call

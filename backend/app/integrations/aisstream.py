@@ -22,6 +22,16 @@ SOURCE = "aisstream"
 POSITION_TYPES = ("PositionReport", "StandardClassBPositionReport", "ExtendedClassBPositionReport")
 
 
+def _dimension(data: dict, first: str, second: str) -> float | None:
+    """AIS dimensions are distances from the antenna: A+B = length, C+D = beam (metres)."""
+    dims = data.get("Dimension") or {}
+    a, b = dims.get(first), dims.get(second)
+    if a is None or b is None:
+        return None
+    total = float(a) + float(b)
+    return total if 0 < total < 500 else None
+
+
 class AISStreamClient:
     def __init__(self, api_key: str, bounding_boxes: list | None = None) -> None:
         self.api_key = api_key
@@ -60,6 +70,9 @@ class AISStreamClient:
                 "call_sign": (data.get("CallSign") or "").strip() or None,
                 "ship_type": ship_type_name(data.get("Type")),
                 "destination": (data.get("Destination") or "").strip() or None,
+                "draught": float(data["MaximumStaticDraught"]) if data.get("MaximumStaticDraught") else None,
+                "length_m": _dimension(data, "A", "B"),
+                "beam_m": _dimension(data, "C", "D"),
             }
             return
         if kind not in POSITION_TYPES:
@@ -86,6 +99,9 @@ class AISStreamClient:
             call_sign=static.get("call_sign"),
             ship_type=static.get("ship_type"),
             destination=static.get("destination"),
+            draught=static.get("draught"),
+            length_m=static.get("length_m"),
+            beam_m=static.get("beam_m"),
         )
 
     async def _run(self) -> None:

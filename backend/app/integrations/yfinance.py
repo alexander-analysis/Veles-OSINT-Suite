@@ -17,7 +17,7 @@ log = logger.bind(component="market")
 EXCHANGE_NAME = "yfinance"
 
 # Friendly asset codes for the tickers used in settings.yaml
-ASSET_CODES = {"GC=F": "GOLD", "CL=F": "OIL", "HG=F": "COPPER", "SI=F": "SILVER", "NG=F": "NATGAS", "BZ=F": "BRENT"}
+ASSET_CODES = {"GC=F": "GOLD", "CL=F": "OIL", "HG=F": "COPPER", "SI=F": "SILVER", "NG=F": "NATGAS", "BZ=F": "BRENT", "TTF=F": "TTF"}
 
 
 def asset_code(ticker: str) -> str:

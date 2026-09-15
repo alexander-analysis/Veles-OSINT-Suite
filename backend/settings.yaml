@@ -6,8 +6,8 @@
 market:
   assets: [BTC, ETH]
   exchanges: [binance, kraken, coinbase]
-  # yfinance tickers: gold, WTI crude, copper
-  commodities: ["GC=F", "CL=F", "HG=F"]
+  # yfinance tickers: gold, WTI crude, Brent, Henry Hub gas, Dutch TTF gas, copper
+  commodities: ["GC=F", "CL=F", "BZ=F", "NG=F", "TTF=F", "HG=F"]
   candle_timeframe: "1m"
   fetch_interval_seconds: 60
   analysis_interval_minutes: 5
@@ -127,6 +127,21 @@ corporate:
   min_name_similarity: 0.9
   max_children: 50
   edgar_enabled: true
+
+energy:
+  # Energy flow monitor: curated terminals / refineries / STS anchorages (app/data/energy_facilities.py),
+  # tanker visits and shipments reconstructed from AIS port calls and draught changes, dark-oil indicators.
+  enabled: true
+  visit_interval_minutes: 5
+  # a tanker inside a facility radius at or below this speed opens a facility visit
+  visit_max_speed_knots: 1.5
+  shipment_interval_minutes: 15
+  dark_oil_interval_minutes: 15
+  dark_oil_lookback_days: 30
+  # loitering in an STS anchorage longer than this raises an indicator
+  sts_loiter_hours: 24
+  snapshot_interval_minutes: 60
+  snapshot_days: 35
 
 retention:
   market_candles_days: 90

@@ -249,6 +249,25 @@ def register_corporate_jobs() -> None:
                       id="corporate.enrich", replace_existing=True)
 
 
+def register_energy_jobs() -> None:
+    from app.bots.energy import energy_bot
+
+    cfg = config_store.get_config().get("energy", {})
+    if not cfg.get("enabled", True):
+        log.info("energy monitor disabled in settings")
+        return
+    boot = datetime.now(timezone.utc)
+    scheduler.add_job(_on_loop(energy_bot.sync_facilities, timeout=300), "interval", hours=12, next_run_time=boot + timedelta(seconds=150), id="energy.sync_facilities", replace_existing=True)
+    scheduler.add_job(_on_loop(energy_bot.track_facility_visits, timeout=300), "interval", minutes=int(cfg.get("visit_interval_minutes", 5)), next_run_time=boot + timedelta(seconds=200),
+                      id="energy.track_visits", replace_existing=True)
+    scheduler.add_job(_on_loop(energy_bot.build_shipments, timeout=300), "interval", minutes=int(cfg.get("shipment_interval_minutes", 15)), next_run_time=boot + timedelta(seconds=260),
+                      id="energy.build_shipments", replace_existing=True)
+    scheduler.add_job(_on_loop(energy_bot.detect_dark_oil, timeout=300), "interval", minutes=int(cfg.get("dark_oil_interval_minutes", 15)), next_run_time=boot + timedelta(seconds=320),
+                      id="energy.detect_dark_oil", replace_existing=True)
+    scheduler.add_job(_on_loop(energy_bot.snapshot_flows, timeout=300), "interval", minutes=int(cfg.get("snapshot_interval_minutes", 60)), next_run_time=boot + timedelta(seconds=380),
+                      id="energy.snapshot_flows", replace_existing=True)
+
+
 def register_notification_jobs() -> None:
     from app import notifications
 
@@ -268,6 +287,7 @@ def start_scheduler() -> BackgroundScheduler:
     register_geopolitical_jobs()
     register_blockchain_jobs()
     register_corporate_jobs()
+    register_energy_jobs()
     register_notification_jobs()
     scheduler.start()
     log.info("started with {} job(s)", len(scheduler.get_jobs()))

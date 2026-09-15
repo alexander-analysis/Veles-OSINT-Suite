@@ -19,6 +19,8 @@ class Vessel(UpdatedTimestampMixin, Base):
     historical_flags = Column(JSON)  # previous flag states (re-flagging detection)
     destination = Column(String(100))  # AIS-declared destination
     draught = Column(Float)  # metres, from static data - laden/ballast inference
+    length_m = Column(Float)  # overall length from AIS dimensions (size class -> cargo estimate)
+    beam_m = Column(Float)
     call_sign = Column(String(20), index=True)
     flag_state = Column(String(3), nullable=False, index=True)  # ISO country code
     ship_type = Column(String(100))  # Tanker, Cargo, ...
@@ -154,6 +156,9 @@ class PortCallEvent(TimestampMixin, Base):
     departure_time = Column(DateTime)
     dwell_time_hours = Column(Float)
     cargo_type_predicted = Column(String(200))  # inferred from vessel type / route
+    draught_arrival = Column(Float)  # metres at arrival (laden / ballast inference)
+    draught_departure = Column(Float)
+    energy_facility_id = Column(Integer, index=True)  # energy_facilities.id when the port is an oil/LNG facility
     flags_raised = Column(JSON)  # anomalies detected (unusual dwell, ...)
 
     vessel = relationship("Vessel", back_populates="port_calls")

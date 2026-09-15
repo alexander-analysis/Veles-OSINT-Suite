@@ -89,6 +89,18 @@ Blockchair is deliberately not used: its keyless tier blacklists an IP after a h
 
 Name matching strips legal-form tokens (LLC, PAO, GmbH, "Public Joint Stock Company", ...) and compares the listed name and its published aliases against the GLEIF legal name and other names; an LEI is attached only above `corporate.min_name_similarity` (0.9). EDGAR full-text search is not used - it returns 403 to non-browser clients.
 
+## Energy flows
+
+| Source | What VELES reads | Cadence | Credential |
+|--------|------------------|---------|------------|
+| Curated facilities (`backend/app/data/energy_facilities.py`) | ~60 export terminals, discharge hubs, refineries, LNG plants and STS anchorages with capacities and sanctions flags | synced every 12 h | - |
+| AIS static data (Digitraffic, aisstream) | Draught and hull dimensions (A+B length, C+D beam) now kept on the vessel; port calls snapshot draught at arrival / departure | with every position | as for AIS |
+| Own port-call / evasion / STS data | Laden departures become shipments (size class -> DWT -> barrels); AIS gaps, spoofing, identity changes and STS meetings after a sanctioned loading become dark-oil indicators | 5 - 15 min | - |
+| Market bot commodities | Brent (`BZ=F`), WTI (`CL=F`), Henry Hub (`NG=F`) and Dutch TTF (`TTF=F`) from yfinance feed the price-context correlation | 5 min | none |
+| EIA / NASA FIRMS | Reserved (`EIA_API_KEY`, `NASA_FIRMS_MAP_KEY`) for official flow statistics and refinery-fire detection - not wired yet | - | key |
+
+Cargo volumes are coarse estimates (size class x 95 % x barrels/tonne, scaled by draught) meant for trend and utilisation, not for cargo accounting.
+
 ## Optional context
 
 | Source | Use | Credential |

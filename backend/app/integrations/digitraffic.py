@@ -69,6 +69,9 @@ class DigitrafficClient:
                     call_sign=(meta.get("callSign") or "").strip() or None,
                     ship_type=ship_type_name(meta.get("shipType")),
                     destination=(meta.get("destination") or "").strip() or None,
+                    draught=meta["draught"] / 10 if meta.get("draught") else None,  # Digitraffic reports decimetres
+                    length_m=(meta.get("referencePointA") or 0) + (meta.get("referencePointB") or 0) or None,
+                    beam_m=(meta.get("referencePointC") or 0) + (meta.get("referencePointD") or 0) or None,
                     extra={"draught_dm": meta.get("draught")},
                 )
             )

@@ -273,7 +273,7 @@ def draft_from_article(title: str, url: str, seen: datetime, source: str, topic_
 
 
 # ------------------------------------------------------------ correlation
-ASSET_SECTORS = {"OIL": "energy", "BRENT": "energy", "NATGAS": "energy", "TTF": "energy", "GOLD": "finance", "COPPER": "trade", "BTC": "finance", "ETH": "finance"}
+ASSET_SECTORS = {"OIL": "energy", "BRENT": "energy", "NATGAS": "energy", "TTF": "energy", "GOLD": "finance", "SILVER": "finance", "COPPER": "trade", "BTC": "finance", "ETH": "finance"}
 
 
 def relevance(event_sectors: list[str], event_countries: list[str], event_type: str, signal: dict) -> tuple[float, list[str]]:

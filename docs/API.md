@@ -128,6 +128,20 @@ total notional ($1M/$5M/$20M/$100M), coordination by confidence.
 | `GET /summary` | Counts: tracked, resolved, exposure, shells, chains, top countries |
 | `GET /status` / `POST /refresh?job=all|seed|enrich` | Bot status; run seeding / a GLEIF batch now (202) |
 
+## Energy (`/api/energy`)
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /facilities?country=&facility_type=&sanctioned=` / `GET /facilities/geojson` | Curated terminals, refineries, LNG plants and STS anchorages with 7 / 30-day tanker-call counters |
+| `GET /facilities/{id}?days=` | Facility detail: recent tanker calls (draught in / out), shipments, daily flow snapshots |
+| `GET /shipments?days=&sanctioned_only=&dark_oil_only=&origin=&destination=&status=&mmsi=` | Tanker voyages reconstructed from facility calls (laden departure -> next call) |
+| `GET /dark-oil?days=&pattern=&min_confidence=&status=` | Dark-oil indicators (sanctioned_loading, sanctioned_vessel_loading, ais_gap_after_loading, sts_transfer, sts_hub_loitering, spoofed_position, identity_change, discharge_to_sanctioned_destination) |
+| `POST /dark-oil/{id}/status?status=investigating|confirmed|cleared&analyst=&notes=` | Investigation workflow (audited) |
+| `GET /flows?days=&facility_id=&country=&sanctioned_only=` | Daily per-facility arrivals / departures / laden departures / estimated barrels / flagged tankers |
+| `GET /price-context?days=` | Laden departures from sanctioned facilities against Brent (fallback WTI) daily closes with a Pearson correlation |
+| `GET /summary?days=` | Counters, indicator mix, most active facilities, origin -> destination countries |
+| `GET /status` / `POST /refresh?job=all|facilities|visits|shipments|dark_oil|snapshots` | Bot status; run a job now (202) |
+
 ## Admin (`/api/admin`)
 
 ### `GET /api/admin/config`

@@ -55,6 +55,9 @@ class AISPosition:
     ship_type: str | None = None
     flag: str | None = None
     destination: str | None = None
+    draught: float | None = None  # metres
+    length_m: float | None = None
+    beam_m: float | None = None
     extra: dict = field(default_factory=dict)
 
     def __post_init__(self) -> None:
