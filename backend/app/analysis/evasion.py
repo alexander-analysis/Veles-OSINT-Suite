@@ -7,9 +7,14 @@ report and return ``EvasionIndicator`` records for the bot to persist.
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from app.analysis.geospatial import describe_location, zones_containing
+from app.analysis.geospatial import describe_location, haversine_m, zones_containing
 
 HIGH_RISK_KINDS = {"sanctions_zone", "war_zone"}
+
+# Plausible top speeds (knots) by declared type; anything faster is a spoofed/garbled report
+MAX_SPEED_BY_TYPE = {"high-speed craft": 70.0, "passenger": 45.0, "military": 45.0, "pleasure craft": 60.0, "search and rescue": 50.0, "law enforcement": 50.0}
+DEFAULT_MAX_SPEED = 30.0
+MAX_IMPLIED_SPEED = 60.0  # between consecutive fixes, any type
 
 
 @dataclass
@@ -81,6 +86,49 @@ def detect_ais_gap(
             "zones_before": zones_before,
             "zones_after": zones_after,
         },
+    )
+
+
+def plausible_max_speed(ship_type: str | None) -> float:
+    lowered = (ship_type or "").lower()
+    for key, value in MAX_SPEED_BY_TYPE.items():
+        if key in lowered:
+            return value
+    return DEFAULT_MAX_SPEED
+
+
+def detect_position_anomaly(previous_time: datetime | None, previous_lat: float | None, previous_lon: float | None, position, ship_type: str | None) -> EvasionIndicator | None:
+    """Physically impossible reports: absurd speed over ground, or a jump no ship could make.
+
+    Ships 'teleporting' inland or reporting 40+ knots are the fingerprint of
+    GNSS spoofing / jamming (endemic in the eastern Baltic and Black Sea) or
+    of deliberate AIS manipulation - either way an intelligence indicator.
+    """
+    reasons: list[str] = []
+    details: dict = {"reported_speed": position.speed}
+    limit = plausible_max_speed(ship_type)
+    if position.speed is not None and position.speed > limit:
+        reasons.append(f"reported speed {position.speed:.1f} kn exceeds {limit:.0f} kn for a {ship_type or 'vessel of unknown type'}")
+    if previous_time is not None and previous_lat is not None and previous_lon is not None:
+        hours = (position.timestamp - previous_time).total_seconds() / 3600
+        if hours > 0:
+            distance_nm = haversine_m(previous_lat, previous_lon, position.lat, position.lon) / 1852
+            implied = distance_nm / hours
+            details.update({"distance_nm": round(distance_nm, 1), "minutes": round(hours * 60, 1), "implied_speed_kn": round(implied, 1)})
+            if distance_nm > 5 and implied > MAX_IMPLIED_SPEED:
+                reasons.append(f"moved {distance_nm:.0f} nm in {hours * 60:.0f} min ({implied:.0f} kn implied)")
+    if not reasons:
+        return None
+    severe = len(reasons) > 1 or details.get("implied_speed_kn", 0) > 200 or (position.speed or 0) > 2 * limit
+    return EvasionIndicator(
+        event_type="position_anomaly",
+        severity="high" if severe else "medium",
+        confidence=0.65 if severe else 0.45,
+        timestamp=position.timestamp,
+        lat=position.lat,
+        lon=position.lon,
+        summary="Implausible AIS report (possible GNSS spoofing/jamming or manipulated transponder): " + "; ".join(reasons) + f" - reported {describe_location(position.lat, position.lon)}",
+        details={**details, "reasons": reasons},
     )
 
 

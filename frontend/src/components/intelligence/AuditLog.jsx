@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Download } from 'lucide-react';
 import { useFetch } from '../../hooks/useFetch';
 import LoadingSpinner from '../common/LoadingSpinner';
+import { downloadFile } from '../../services/api';
 import StatusBadge from '../common/StatusBadge';
 
 const CLASSIFICATION_TONE = { UNCLASSIFIED: 'ok', CONFIDENTIAL: 'warn', SECRET: 'error' };
@@ -19,19 +20,11 @@ export default function AuditLog({ vesselId, compact = false }) {
   const { data, loading, error } = useFetch(`/api/maritime/audit-log?${params}`, 30000);
   const { data: actions } = useFetch('/api/maritime/audit-log/actions', 0);
 
-  const exportLog = async (format) => {
-    const response = await fetch('/api/maritime/audit-log/export', {
+  const exportLog = (format) =>
+    downloadFile('/api/maritime/audit-log/export', format === 'pdf' ? 'VELES_Intelligence_Report.pdf' : `VELES_Audit_Log.${format}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ format, action_type: action || null, vessel_id: vesselId || null, requested_by: 'analyst' }),
-    });
-    const blob = await response.blob();
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `VELES_Audit_Log.${format}`;
-    link.click();
-    URL.revokeObjectURL(link.href);
-  };
+    }).catch((err) => alert(err.message));
 
   return (
     <div>
@@ -44,6 +37,7 @@ export default function AuditLog({ vesselId, compact = false }) {
         <span className="ml-auto flex gap-1">
           <button type="button" onClick={() => exportLog('json')} className="flex items-center gap-1 px-2 py-1 border border-gray-300 rounded bg-white hover:bg-gray-100"><Download size={12} aria-hidden="true" /> JSON</button>
           <button type="button" onClick={() => exportLog('csv')} className="flex items-center gap-1 px-2 py-1 border border-gray-300 rounded bg-white hover:bg-gray-100"><Download size={12} aria-hidden="true" /> CSV</button>
+          <button type="button" onClick={() => exportLog('pdf')} className="flex items-center gap-1 px-2 py-1 border border-gray-300 rounded bg-white hover:bg-gray-100"><Download size={12} aria-hidden="true" /> PDF report</button>
         </span>
       </div>
       {loading && !data && <LoadingSpinner />}

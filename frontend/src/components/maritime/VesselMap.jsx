@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { MapContainer, TileLayer, CircleMarker, Polygon, Popup, Tooltip, useMap, LayersControl, LayerGroup, Polyline, Marker } from 'react-leaflet';
+import { MapContainer, TileLayer, CircleMarker, Polygon, Popup, Tooltip, useMap, useMapEvents, LayersControl, LayerGroup, Polyline, Marker } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Link } from 'react-router-dom';
@@ -26,6 +26,30 @@ function InvalidateOnMount() {
       window.removeEventListener('resize', onResize);
     };
   }, [map]);
+  return null;
+}
+
+function ViewportWatcher({ onViewChange }) {
+  // Report the visible bbox (padded) after every pan/zoom so the page can fetch just that area.
+  const map = useMapEvents({
+    moveend: () => report(),
+    zoomend: () => report(),
+  });
+  const report = () => {
+    if (!onViewChange) return;
+    const b = map.getBounds().pad(0.15);
+    onViewChange({
+      zoom: map.getZoom(),
+      bbox: [Math.max(-180, b.getWest()), Math.max(-90, b.getSouth()), Math.min(180, b.getEast()), Math.min(90, b.getNorth())].map((n) => Number(n.toFixed(3))),
+    });
+  };
+  const initial = useRef(false);
+  useEffect(() => {
+    if (initial.current) return undefined;
+    initial.current = true;
+    const t = setTimeout(report, 1200);
+    return () => clearTimeout(t);
+  });
   return null;
 }
 
@@ -69,7 +93,7 @@ const breachIcon = (severity) =>
  * Interactive vessel map: OSM tiles, colour-coded vessel markers, breach markers,
  * sanctions/monitoring zones by authority, lanes/chokepoints, ports and an optional track.
  */
-export default function VesselMap({ vessels, breaches, selectedTrack, height = '600px', center = [60, 24], zoom = 6 }) {
+export default function VesselMap({ vessels, breaches, selectedTrack, height = '600px', center = [60, 24], zoom = 6, onViewChange, fitToData = true }) {
   const { data: zones } = useFetch('/api/maritime/sanctions-zones', 0);
   const { data: lanes } = useFetch('/api/maritime/shipping-lanes', 0);
   const { data: ports } = useFetch('/api/maritime/ports', 0);
@@ -90,7 +114,8 @@ export default function VesselMap({ vessels, breaches, selectedTrack, height = '
       <MapContainer center={center} zoom={zoom} style={{ height: '100%', width: '100%' }} preferCanvas>
         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' maxZoom={19} />
         <InvalidateOnMount />
-        <FitOnce features={features} />
+        {fitToData && <FitOnce features={features} />}
+        {onViewChange && <ViewportWatcher onViewChange={onViewChange} />}
         <LayersControl position="topright">
           <LayersControl.Overlay checked name="OFAC zones">
             <LayerGroup>{zones?.ofac && <ZoneLayer features={zones.ofac.features} styleKey="ofac" />}</LayerGroup>

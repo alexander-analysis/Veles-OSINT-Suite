@@ -18,7 +18,7 @@ def test_geospatial_helpers():
     assert nearest_port(*PRIMORSK)[0]["name"] == "Primorsk"
     assert nearest_port(*OPEN_SEA, within_km=3) is None
     assert {z.name for z in zones_containing(*PRIMORSK)} == {"Gulf of Finland - Russian terminals"}
-    assert any(l.name == "Gulf of Finland corridor" for l in lanes_containing(*OPEN_SEA))
+    assert any(lane.name == "Gulf of Finland corridor" for lane in lanes_containing(*OPEN_SEA))
     assert "Primorsk" in describe_location(60.30, 28.60)
     assert flag_from_mmsi("273123456") == "RU" and flag_from_mmsi("999000000") == "XX"
     assert ship_type_name(84) == "Tanker" and ship_type_name(52) == "Tug"
@@ -209,7 +209,11 @@ def test_maritime_api(client, maritime_setup):
     assert csv_export.status_code == 200 and csv_export.headers["content-type"].startswith("text/csv") and "breach_detected" in csv_export.text
     json_export = client.post("/api/maritime/audit-log/export", json={"format": "json", "classification": "CONFIDENTIAL"}).json()
     assert json_export["classification"] == "CONFIDENTIAL" and json_export["total"] >= 1
-    assert client.post("/api/maritime/audit-log/export", json={"format": "pdf"}).status_code == 501
+    pdf_export = client.post("/api/maritime/audit-log/export", json={"format": "pdf", "classification": "SECRET"})
+    assert pdf_export.status_code == 200 and pdf_export.headers["content-type"] == "application/pdf" and pdf_export.content[:5] == b"%PDF-"
+    report = client.get("/api/maritime/report?days=7").json()
+    assert report["executive_summary"]["breaches"] >= 1 and report["recommendations"]
+    assert client.get("/api/maritime/report?days=7&format=pdf&sections=executive_summary,breach_analysis").content[:5] == b"%PDF-"
 
     # clearing the only breach clears the vessel and is audited
     breach_id = breaches["breaches"][0]["id"]
@@ -220,7 +224,60 @@ def test_maritime_api(client, maritime_setup):
     assert client.get("/api/maritime/status").json()["vessels_tracked"] >= 5
 
 
+def test_position_anomaly_detection():
+    now = utcnow()
+    inland = AISPosition(mmsi="273219650", lat=57.64, lon=32.48, timestamp=now, source="test", speed=42.2, ship_type="Other")
+    anomaly = evasion.detect_position_anomaly(None, None, None, inland, "Other")
+    assert anomaly.event_type == "position_anomaly" and "42.2 kn" in anomaly.summary
+    jump = evasion.detect_position_anomaly(now - timedelta(minutes=30), 60.0, 25.0, inland, "Other")
+    assert jump.severity == "high" and jump.details["implied_speed_kn"] > 200 and len(jump.details["reasons"]) == 2
+    ferry = AISPosition(mmsi="1", lat=60.0, lon=25.0, timestamp=now, source="test", speed=38.0, ship_type="High-speed craft")
+    assert evasion.detect_position_anomaly(now - timedelta(minutes=30), 59.9, 24.8, ferry, "High-speed craft") is None
+    assert evasion.plausible_max_speed("Tanker") == 30.0
+
+
 def test_websocket_stream(client):
     with client.websocket_connect("/api/maritime/stream") as ws:
         hello = ws.receive_json()
         assert hello["type"] == "hello" and hello["data"]["clients"] == 1
+
+
+def test_imo_reconciliation_clears_namesake(client, maritime_setup):
+    """A name-only match is auto-cleared once the vessel's own IMO turns out to differ from the listed one."""
+    bot = maritime_setup
+    cfg = bot.config()
+    stats = bot._ingest([_pos("626000777", 5.5, -1.0, 5, name="SHADOW STAR", flag="GA", speed=8.0, ship_type="Tanker")], cfg)
+    assert stats["breaches"] == 1  # exact name, flag agrees -> 0.9
+    assert client.get("/api/maritime/vessels/table?q=626000777").json()["vessels"][0]["sanctioned_status"] == "breach_ofac"
+    stats = bot._ingest([_pos("626000777", 5.6, -1.1, 0, name="SHADOW STAR", flag="GA", speed=8.0, ship_type="Tanker", imo="2222222")], cfg)
+    assert stats["breaches_auto_cleared"] == 1
+    vessel = client.get("/api/maritime/vessels/table?q=626000777").json()["vessels"][0]
+    assert vessel["sanctioned_status"] == "clear" and vessel["imo"] == "2222222"
+    cleared = client.get("/api/maritime/audit-log?action_type=cleared&user=system").json()
+    assert cleared["total"] >= 1 and "namesake" in cleared["entries"][0]["rationale"]
+
+
+def test_imo_claims_never_violate_uniqueness(client, maritime_setup):
+    """Two live MMSIs claiming one IMO in a batch -> one holder, one identity_conflict; a silent holder transfers."""
+    bot = maritime_setup
+    cfg = bot.config()
+    stats = bot._ingest([
+        _pos("636099001", 10.0, 10.0, 1, name="HOLDER", imo="9555555", speed=5.0),
+        _pos("636099002", 10.1, 10.1, 0, name="CLAIMANT", imo="9555555", speed=5.0),
+    ], cfg)
+    assert stats["new_vessels"] == 2 and stats["identity_conflicts"] == 1
+    table = {v["mmsi"]: v for v in client.get("/api/maritime/vessels/table?q=6360990").json()["vessels"]}
+    assert table["636099001"]["imo"] == "9555555" and table["636099002"]["imo"] is None
+    # the holder goes silent for two days; a new MMSI reports the hull -> identity transfers with history
+    from app.database import SessionLocal
+    from app.models.maritime import Vessel
+    with SessionLocal() as db:
+        holder = db.execute(__import__("sqlalchemy").select(Vessel).where(Vessel.mmsi == "636099001")).scalar_one()
+        holder.last_ais_update = utcnow() - timedelta(days=2)
+        db.commit()
+    stats = bot._ingest([_pos("636099003", 10.2, 10.2, 0, name="REBORN", imo="9555555", speed=5.0)], cfg)
+    assert stats["identity_transfers"] == 1
+    table = {v["mmsi"]: v for v in client.get("/api/maritime/vessels/table?q=6360990&max_age_hours=100").json()["vessels"]}
+    assert table["636099003"]["imo"] == "9555555" and table["636099001"]["imo"] is None
+    profile = client.get("/api/maritime/vessel/636099003").json()
+    assert "HOLDER" in profile["vessel"]["historical_names"]

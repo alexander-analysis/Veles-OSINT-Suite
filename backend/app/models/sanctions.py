@@ -7,7 +7,7 @@ auditable; "designated by" views are grouped at query time by normalised name.
 ``SanctionsProgramTracking`` keeps per-programme counts.
 """
 
-from sqlalchemy import JSON, Boolean, Column, DateTime, Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from app.models.base import Base, utcnow

@@ -45,6 +45,7 @@ def _record_to_row(record: SanctionedEntityRecord) -> dict[str, Any]:
         "call_sign": record.call_sign,
         "vessel_flag": record.vessel_flag,
         "vessel_owner": record.vessel_owner[:300] if record.vessel_owner else None,
+        "vessel_type": (record.vessel_type or None) and record.vessel_type[:100],
         "remarks": record.remarks,
         "is_active": True,
         "delisting_date": None,

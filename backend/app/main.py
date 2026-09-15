@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app import __version__
 from app.api import admin, health, maritime, market, sanctions, stream
+from app.auth import APITokenMiddleware
 from app.bots.scheduler import start_scheduler, stop_scheduler
 from app.config import BACKEND_DIR, settings
 from app.database import DATABASE_URL, init_db
@@ -39,6 +40,8 @@ app = FastAPI(
     description="OSINT intelligence platform: multi-exchange market surveillance and maritime sanctions monitoring.",
     lifespan=lifespan,
 )
+
+app.add_middleware(APITokenMiddleware)
 
 # The frontend is served by Vite (dev) or Nginx (prod) on a different origin
 app.add_middleware(

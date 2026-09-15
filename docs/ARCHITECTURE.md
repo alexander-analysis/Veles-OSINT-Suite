@@ -47,7 +47,9 @@ Nginx (static frontend + /api proxy + WebSocket)  <--  Cloudflare Tunnel  <--  a
 | `bots/` | `runtime.py` (dedicated asyncio loop), `scheduler.py` (APScheduler), `market.py`, `sanctions.py`, `maritime.py`. |
 | `analysis/` | Pure analysis: `market_anomaly`, `coordination`, `liquidation`, `sanctions` (index + rules), `evasion`, `transshipment`, `ports`, `geospatial`, `correlation`, `risk`. |
 | `integrations/` | ccxt exchanges, Binance liquidation stream, yfinance; AIS: Digitraffic, aisstream, MarineTraffic, AISHub, NMEA/UDP; OFAC/EU/UN importers; OpenWeatherMap. |
-| `utils/` | `logger` (loguru, rotating files), `time` (naive-UTC helpers), `config_store` (settings.yaml + overrides). |
+| `utils/` | `logger` (loguru, rotating files), `time` (naive-UTC helpers), `config_store` (settings.yaml + overrides), `serialization`. |
+| `reports/` | reportlab PDF builder and report content (maritime / sanctions / market). |
+| `auth.py`, `notifications.py` | Optional API token middleware; webhook / e-mail alerts and daily digest. |
 
 ## Conventions
 
@@ -73,4 +75,4 @@ Nginx (static frontend + /api proxy + WebSocket)  <--  Cloudflare Tunnel  <--  a
 | 2 | Market bot: exchange ingestion, 3-sigma anomalies, volume spikes, coordination, liquidation cascades, market dashboard | done |
 | 2.5 | Sanctions bot: OFAC/EU/UN import + diffing, screening index, entity search/check, updates timeline | done |
 | 3 | Maritime bot: AIS ingestion, OFAC/EU/UN screening, evasion/transshipment/ports/zones, map, breach board, audit log UI, WebSocket | done |
-| 4 | Polish: PDF reports, settings editor, alerts/digests, CI, hardening | next |
+| 4 | Polish: PDF reports, settings editor, dashboard KPIs, linkage explorer, notifications, API token, position-anomaly detection, CI, docs | done (v1.0.0) |

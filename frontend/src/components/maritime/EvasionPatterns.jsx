@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import clsx from 'clsx';
-import { EyeOff, Flag, Tag, Fingerprint, Radio } from 'lucide-react';
+import { EyeOff, Flag, Tag, Fingerprint, Radio, MapPinOff } from 'lucide-react';
 import { useFetch } from '../../hooks/useFetch';
 import LoadingSpinner from '../common/LoadingSpinner';
 
-const ICONS = { ais_gap: Radio, name_change: Tag, flag_change: Flag, identity_conflict: Fingerprint, dark_in_zone: EyeOff, dark_vessel: EyeOff };
+const ICONS = { ais_gap: Radio, name_change: Tag, flag_change: Flag, identity_conflict: Fingerprint, dark_in_zone: EyeOff, dark_vessel: EyeOff, position_anomaly: MapPinOff };
 const SEVERITY = { critical: 'border-red-900 bg-red-50', high: 'border-red bg-red-50', medium: 'border-orange bg-orange-50', low: 'border-gray-300 bg-white' };
-const LABEL = { ais_gap: 'AIS gap', name_change: 'name change', flag_change: 'flag change', identity_conflict: 'identity conflict', dark_in_zone: 'dark in zone', dark_vessel: 'dark vessel' };
+const LABEL = { ais_gap: 'AIS gap', name_change: 'name change', flag_change: 'flag change', identity_conflict: 'identity conflict', dark_in_zone: 'dark in zone', dark_vessel: 'dark vessel', position_anomaly: 'position anomaly (spoofing?)' };
 
 /** AIS gaps, renames, re-flagging, identity conflicts and dark vessels. */
 export default function EvasionPatterns() {

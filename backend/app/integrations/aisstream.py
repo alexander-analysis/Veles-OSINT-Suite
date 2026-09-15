@@ -92,7 +92,7 @@ class AISStreamClient:
         delay = 5
         while True:
             try:
-                async with websockets.connect(URL, ping_interval=20, ping_timeout=20, max_size=None) as socket:
+                async with websockets.connect(URL, ping_interval=30, ping_timeout=90, max_size=None) as socket:
                     await socket.send(json.dumps({"APIKey": self.api_key, "BoundingBoxes": self.bounding_boxes}))
                     self.connected = True
                     delay = 5

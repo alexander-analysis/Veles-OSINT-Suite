@@ -7,13 +7,16 @@ OFAC, EU and UN sanctions lists, with evasion detection and an immutable audit
 trail). Runs 24/7 on a Raspberry Pi 5 and is reachable remotely through a
 Cloudflare Tunnel.
 
-**Status: Phase 3 (maritime intelligence) complete** - live AIS tracking
-(Digitraffic keyless; aisstream.io / MarineTraffic / AISHub / RTL-SDR with
-credentials), OFAC / EU / UN sanctions screening with an audited breach board,
-AIS-gap / rename / re-flag / identity-conflict detection, ship-to-ship
-rendezvous, port intelligence, zone & chokepoint monitoring, entity linkage,
-WebSocket live map and an immutable audit log with JSON/CSV export. Phase 4
-(polish & production) is next. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+**Status: v1.0.0 - all four phases complete.**
+
+| Module | What it does |
+|--------|--------------|
+| Market intelligence | 1-minute candles from Binance, Kraken and Coinbase plus commodity futures; 3-sigma price anomalies, volume spikes, cross-exchange coordination, Binance liquidation cascades; charts, alert board, PDF/CSV briefs |
+| Sanctions monitoring | OFAC SDN, EU consolidated and UN Security Council lists refreshed every 6 h and diffed (new designations, delistings, changes); entity search and audited screening checks; programme tracking |
+| Maritime intelligence | Live AIS (Digitraffic keyless; aisstream.io / MarineTraffic / AISHub / NMEA feeds / RTL-SDR with credentials or hardware); IMO/name/owner screening against all three lists; AIS gaps, renames, re-flagging, identity conflicts, spoofed positions; ship-to-ship rendezvous; port intelligence; monitored zones and chokepoints; entity linkage and risk scoring; live map over WebSocket |
+| Compliance | Append-only audit log (enforced in the ORM and the database), classification markings, PDF/JSON/CSV intelligence reports, optional API token, webhook / e-mail alerts and a daily digest |
+
+Docs: [ARCHITECTURE](docs/ARCHITECTURE.md) - [API](docs/API.md) - [DEPLOYMENT](docs/DEPLOYMENT.md) - [DATA_SOURCES](docs/DATA_SOURCES.md) - [USER_GUIDE](docs/USER_GUIDE.md) - [DEVELOPMENT](docs/DEVELOPMENT.md) - [SECURITY](docs/SECURITY.md) - [LICENSES](docs/LICENSES.md)
 
 ## Quick start
 
@@ -39,14 +42,15 @@ Or build once (`npm run build`) and let the backend serve the UI at
 backend/      FastAPI app - app/{api,models,schemas,bots,analysis,integrations,utils}, Alembic migrations, tests
 frontend/     React 18 + Vite + Tailwind (light, agency-style theme)
 deployment/   nginx.conf, systemd unit, pi-setup.sh, Cloudflare Tunnel guide
-docs/         ARCHITECTURE.md, API.md, DEPLOYMENT.md, DATA_SOURCES.md
+docs/         architecture, API, deployment, data sources, user/developer guides, security, licences
+.github/      CI (pytest + flake8 on 3.11/3.13, eslint + build on Node 22)
 ```
 
 ## Stack
 
-Python 3.11+ / FastAPI / SQLAlchemy 2 / Alembic / APScheduler / SQLite (WAL)
-- React 18 / Vite 5 / Tailwind 3 / Leaflet / Chart.js - Nginx - Cloudflare
-Tunnel.
+Python 3.11+ / FastAPI / SQLAlchemy 2 / Alembic / APScheduler / SQLite (WAL) /
+reportlab - React 18 / Vite 5 / Tailwind 3 / Leaflet / Chart.js - Nginx -
+Cloudflare Tunnel.
 
 ## Deploying to a Pi
 
@@ -55,7 +59,9 @@ git clone https://github.com/alexander-analysis/Veles-OSINT-Suite.git ~/veles-os
 cd ~/veles-osint && bash deployment/pi-setup.sh
 ```
 
-Details in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+Then add keys to `backend/.env` (see [docs/DATA_SOURCES.md](docs/DATA_SOURCES.md) -
+`AISSTREAM_API_KEY` gives the map global coverage) and follow
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the tunnel and hardening.
 
 ## License
 

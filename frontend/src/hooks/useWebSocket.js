@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { getApiToken } from '../services/api';
 
 /**
  * Auto-reconnecting WebSocket for the maritime stream.
@@ -23,7 +24,8 @@ export function useWebSocket(path, onMessage) {
         ? base.replace(/^http/, 'ws') + path
         : `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}${path}`;
       setStatus('connecting');
-      socket = new WebSocket(url);
+      const token = getApiToken();
+      socket = new WebSocket(token ? `${url}${url.includes('?') ? '&' : '?'}access_token=${encodeURIComponent(token)}` : url);
       socket.onopen = () => {
         setStatus('open');
         delay = 2000;

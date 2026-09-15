@@ -186,6 +186,13 @@ def register_maritime_jobs() -> None:
     scheduler.add_job(_on_loop(maritime_bot.fetch_ais_positions, timeout=120), id="maritime.initial_fetch", replace_existing=True)
 
 
+def register_notification_jobs() -> None:
+    from app import notifications
+
+    cfg = config_store.get_config().get("notifications", {})
+    scheduler.add_job(_on_loop(notifications.send_daily_digest, timeout=120), "cron", hour=int(cfg.get("digest_hour_utc", 7)), minute=0, id="notifications.daily_digest", replace_existing=True)
+
+
 def start_scheduler() -> BackgroundScheduler:
     """Register the standing jobs and start the scheduler (idempotent)."""
     if scheduler.running:
@@ -195,6 +202,7 @@ def start_scheduler() -> BackgroundScheduler:
     register_market_jobs()
     register_sanctions_jobs()
     register_maritime_jobs()
+    register_notification_jobs()
     scheduler.start()
     log.info("started with {} job(s)", len(scheduler.get_jobs()))
     return scheduler

@@ -41,6 +41,9 @@ pydantic-settings>=2.5
 python-dotenv>=1.0
 PyYAML>=6.0.2
 
+# Reports
+reportlab>=4.2
+
 # Utilities
 python-dateutil>=2.9
 requests>=2.32

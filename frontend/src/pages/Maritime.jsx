@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import clsx from 'clsx';
 import PageHeader from '../components/common/PageHeader';
 import StatusBadge from '../components/common/StatusBadge';
@@ -22,7 +22,14 @@ const TABS = [
 ];
 
 export default function Maritime() {
-  const { data: vessels, refetch: refetchVessels } = useFetch('/api/maritime/vessels?max_age_hours=6', 60000);
+  const [view, setView] = useState(null);
+  // Zoomed out: the 5,000 highest-risk vessels worldwide. Zoomed in: everything inside the visible area.
+  const vesselsUrl = useMemo(
+    () => (view && view.zoom >= 5 ? `/api/maritime/vessels?max_age_hours=6&bbox=${view.bbox.join(',')}` : '/api/maritime/vessels?max_age_hours=6'),
+    [view],
+  );
+  const { data: vessels, refetch: refetchVessels } = useFetch(vesselsUrl, 60000);
+  const onViewChange = useCallback((next) => setView((current) => (current && current.zoom === next.zoom && current.bbox.join() === next.bbox.join() ? current : next)), []);
   const { data: breaches, refetch: refetchBreaches } = useFetch('/api/maritime/breaches?limit=500', 60000);
   const { data: status } = useFetch('/api/maritime/status', 30000);
   const [tab, setTab] = useState('vessels');
@@ -49,7 +56,7 @@ export default function Maritime() {
     <div>
       <PageHeader title="Maritime Intelligence" subtitle="Live AIS tracking, sanctions screening and evasion detection">
         <StatusBadge tone={wsStatus === 'open' ? 'ok' : 'warn'}>stream {wsStatus}</StatusBadge>
-        <StatusBadge tone={vessels?.vessel_count ? 'ok' : 'neutral'}>{vessels ? `${vessels.vessel_count} vessels (6 h)` : 'loading'}</StatusBadge>
+        <StatusBadge tone={vessels?.vessel_count ? 'ok' : 'neutral'}>{vessels ? `${vessels.vessel_count} vessels ${view && view.zoom >= 5 ? 'in view' : '(top risk, zoom in for all)'}` : 'loading'}</StatusBadge>
         <StatusBadge tone={breaches?.total ? 'error' : 'ok'}>{breaches ? `${breaches.total} open breach(es)` : ''}</StatusBadge>
       </PageHeader>
 
@@ -67,7 +74,7 @@ export default function Maritime() {
       )}
 
       <div className="card p-0 overflow-hidden mb-4">
-        <VesselMap vessels={vessels} breaches={breaches?.breaches} height="560px" />
+        <VesselMap vessels={vessels} breaches={breaches?.breaches} height="560px" onViewChange={onViewChange} fitToData={false} center={[45, 20]} zoom={3} />
       </div>
 
       {status && (

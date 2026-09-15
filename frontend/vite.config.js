@@ -17,5 +17,14 @@ export default defineConfig({
   },
   build: {
     sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          leaflet: ['leaflet', 'react-leaflet'],
+          charts: ['chart.js', 'react-chartjs-2'],
+          vendor: ['react', 'react-dom', 'react-router-dom', '@tanstack/react-table', 'lucide-react', 'clsx'],
+        },
+      },
+    },
   },
 });

@@ -4,7 +4,7 @@ import re
 from datetime import timedelta
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import String, func, or_, select
 from sqlalchemy.orm import Session
 
@@ -28,6 +28,8 @@ from app.schemas.sanctions import (
     UpdatesResponse,
     VesselSanctionsResponse,
 )
+from app.reports.intelligence import sanctions_report_from
+from app.reports.pdf import build_pdf
 from app.utils.serialization import jsonable
 from app.utils.time import utcnow
 
@@ -253,8 +255,8 @@ def get_programs(authority: str | None = None, db: Session = Depends(get_db)) ->
 
 
 @router.get("/report/{timeframe}")
-def get_report(timeframe: str, include_programs: str | None = None, authority: str | None = None) -> dict[str, Any]:
-    """Recent sanctions-activity report as JSON (``7days``, ``30days``, ``24h``). PDF export arrives in Phase 4."""
+def get_report(timeframe: str, include_programs: str | None = None, authority: str | None = None, format: str = Query("json", pattern="^(json|pdf)$"), classification: str = Query("UNCLASSIFIED", max_length=50)):
+    """Recent sanctions-activity report (``7days``, ``30days``, ``24h``) as JSON or PDF."""
     match = re.fullmatch(r"(\d+)\s*(d|days?|h|hours?)", timeframe.strip().lower())
     if not match:
         raise HTTPException(status_code=422, detail="timeframe must look like 7days or 24h")
@@ -264,7 +266,10 @@ def get_report(timeframe: str, include_programs: str | None = None, authority: s
     if include_programs:
         wanted = [p.upper() for p in _csv(include_programs)]
         report["updates"] = [u for u in report["updates"] if any(w in (p.upper() for p in ((u.get("new") or {}).get("programs") or [])) for w in wanted)]
-    return jsonable(report)
+    report = jsonable(report)
+    if format == "pdf":
+        return Response(build_pdf(sanctions_report_from(report, classification)), media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=VELES_Sanctions_Report_{utcnow():%Y-%m-%d}.pdf"})
+    return report
 
 
 @router.get("/status")

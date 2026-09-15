@@ -50,6 +50,17 @@ class Settings(BaseSettings):
     # Cloudflare Tunnel
     CLOUDFLARE_TOKEN: str = ""
 
+    # Optional API protection (see app/auth.py)
+    VELES_API_TOKEN: str = ""
+
+    # Notifications (see app/notifications.py)
+    NOTIFY_WEBHOOK_URL: str = ""
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM: str = ""
+
     def resolve_path(self, value: str | Path) -> Path:
         """Return ``value`` as an absolute path, anchored at backend/ if relative."""
         path = Path(value)

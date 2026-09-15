@@ -35,6 +35,8 @@ from app.schemas.maritime import (
     VesselProperties,
     VesselSummary,
 )
+from app.reports.intelligence import maritime_report
+from app.reports.pdf import build_pdf
 from app.utils.serialization import jsonable
 from app.utils.time import to_iso_z, utcnow
 
@@ -177,7 +179,7 @@ def vessel_profile(mmsi: str, positions: int = Query(500, ge=1, le=5000), db: Se
             "port_history": [PortCallOut.model_validate(_port_view(c, vessel)).model_dump() for c in port_calls],
             "evasion_events": [EvasionOut.model_validate(_evasion_view(e, vessel)).model_dump() for e in evasion],
             "transshipments": [_sts_view(e).model_dump() for e in sts],
-            "lane_events": [LaneViolationOut.model_validate(_lane_view(l, vessel)).model_dump() for l in lanes],
+            "lane_events": [LaneViolationOut.model_validate(_lane_view(lane, vessel)).model_dump() for lane in lanes],
             "position_timeline": [
                 {"timestamp": p.timestamp, "lat": p.latitude, "lon": p.longitude, "speed": p.speed, "heading": p.heading, "course": p.course, "source": p.ais_source}
                 for p in reversed(track)
@@ -387,8 +389,8 @@ def get_ports() -> dict[str, Any]:
 
 
 # ---------------------------------------------------------- lanes and zones
-def _lane_view(l: ShippingLaneViolation, vessel: Vessel | None = None) -> dict[str, Any]:
-    return {**{c.name: getattr(l, c.name) for c in ShippingLaneViolation.__table__.columns}, "vessel_name": vessel.name if vessel else None}
+def _lane_view(violation: ShippingLaneViolation, vessel: Vessel | None = None) -> dict[str, Any]:
+    return {**{c.name: getattr(violation, c.name) for c in ShippingLaneViolation.__table__.columns}, "vessel_name": vessel.name if vessel else None}
 
 
 @router.get("/shipping-lanes")
@@ -417,7 +419,7 @@ def get_lane_violations(hours: int = Query(24 * 7, ge=1), context: str | None = 
         stmt = stmt.where(ShippingLaneViolation.context == context)
     rows = db.execute(stmt.order_by(ShippingLaneViolation.timestamp.desc()).limit(limit)).all()
     by_lane = dict(db.execute(select(ShippingLaneViolation.lane_name, func.count()).where(ShippingLaneViolation.timestamp >= utcnow() - timedelta(hours=hours)).group_by(ShippingLaneViolation.lane_name)).all())
-    return jsonable({"total": len(rows), "by_lane": by_lane, "violations": [LaneViolationOut.model_validate(_lane_view(l, v)).model_dump() for l, v in rows]})
+    return jsonable({"total": len(rows), "by_lane": by_lane, "violations": [LaneViolationOut.model_validate(_lane_view(violation, v)).model_dump() for violation, v in rows]})
 
 
 # ------------------------------------------------------------------ audit log
@@ -468,12 +470,32 @@ def export_audit_log(body: ExportRequest, db: Session = Depends(get_db)):
             writer.writerow([a.id, to_iso_z(a.timestamp), a.action_type, a.user_id, a.vessel_id, a.breach_id, a.sanctioned_entity_name, ";".join(a.sanctioning_authorities or []), a.rationale, a.classification_level])
         return Response(buffer.getvalue(), media_type="text/csv", headers={"Content-Disposition": f"attachment; filename=VELES_Audit_Log_{stamp}.csv"})
     if body.format == "pdf":
-        raise HTTPException(status_code=501, detail="PDF export arrives in Phase 4; use json or csv")
+        start = body.start_date or (utcnow() - timedelta(days=14))
+        end = body.end_date or utcnow()
+        report, _ = maritime_report(db, start, end, body.include_sections, body.classification, body.vessel_id)
+        return Response(build_pdf(report), media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=VELES_Intelligence_Report_{stamp}.pdf"})
     payload = {
         "classification": body.classification, "generated_at": utcnow(), "period": {"start": body.start_date, "end": body.end_date},
         "sections": body.include_sections, "total": len(rows), "entries": [AuditEntryOut.model_validate(a).model_dump() for a in rows],
     }
     return Response(json.dumps(jsonable(payload), default=str, indent=2), media_type="application/json", headers={"Content-Disposition": f"attachment; filename=VELES_Audit_Log_{stamp}.json"})
+
+
+@router.get("/report")
+def maritime_intelligence_report(
+    days: int = Query(7, ge=1, le=365), format: Literal["json", "pdf"] = "json", classification: str = Query("UNCLASSIFIED", max_length=50),
+    sections: str | None = Query(None, description="Comma-separated subset of: executive_summary,breach_analysis,vessel_profiles,evasion,transshipment,port_activity,zone_activity,audit_entries,recommendations"),
+    db: Session = Depends(get_db),
+):
+    """Maritime intelligence report for the last ``days`` (JSON or PDF), audited as an export."""
+    end = utcnow()
+    start = end - timedelta(days=days)
+    report, data = maritime_report(db, start, end, _csv(sections) or None, classification)
+    _audit(db, "export", "anonymous", f"Maritime intelligence report ({format}, {days} d)", data={"format": format, "classification": classification, "days": days})
+    db.commit()
+    if format == "pdf":
+        return Response(build_pdf(report), media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=VELES_Maritime_Report_{end:%Y-%m-%d}.pdf"})
+    return jsonable(data)
 
 
 # -------------------------------------------------------------------- status

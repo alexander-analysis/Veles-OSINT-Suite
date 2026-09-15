@@ -23,6 +23,15 @@ from app.utils.time import utcnow
 # Jurisdictions under comprehensive (territory-wide) US sanctions programmes
 COMPREHENSIVE_PROGRAMS = {"IR": "IRAN", "KP": "DPRK", "SY": "SYRIA", "CU": "CUBA"}
 STOPWORDS = {"THE", "OF", "AND", "CO", "LTD", "LLC", "INC", "SA", "AO", "OOO", "COMPANY", "LIMITED", "SHIPPING", "MV", "MT"}
+MAX_CANDIDATES = 400  # fuzzy candidates per query - rarest tokens first
+MAX_TOKEN_FANOUT = 2000  # tokens shared by more listings than this are too common to generate candidates
+# Coarse ship categories used to rule out namesakes (a listed crude tanker is not a fishing boat)
+TYPE_CATEGORIES = {
+    "tanker": "tanker", "crude": "tanker", "lng": "tanker", "lpg": "tanker", "chemical": "tanker", "product": "tanker",
+    "cargo": "cargo", "bulk": "cargo", "container": "cargo", "general": "cargo", "ro-ro": "cargo", "reefer": "cargo",
+    "fishing": "fishing", "passenger": "passenger", "ferry": "passenger", "tug": "service", "pilot": "service",
+    "sailing": "leisure", "pleasure": "leisure", "yacht": "leisure",
+}
 MATCH_LABELS = {
     "imo": "IMO", "mmsi": "MMSI", "name_exact": "name", "name_fuzzy": "name (fuzzy)",
     "owner": "owner", "operator": "operator", "beneficial_owner": "beneficial owner",
@@ -57,6 +66,7 @@ class IndexedEntity:
     country: str | None
     vessel_flag: str | None
     designation_date: object = None
+    vessel_type: str | None = None
 
 
 @dataclass
@@ -78,6 +88,20 @@ class Match:
 
 def _tokens(normalized: str) -> set[str]:
     return {t for t in normalized.split() if len(t) >= 3 and t not in STOPWORDS}
+
+
+def type_category(ship_type: str | None) -> str | None:
+    lowered = (ship_type or "").lower()
+    for key, category in TYPE_CATEGORIES.items():
+        if key in lowered:
+            return category
+    return None
+
+
+def types_conflict(listed_type: str | None, observed_type: str | None) -> bool:
+    """True when both types are known and clearly describe different kinds of ship."""
+    a, b = type_category(listed_type), type_category(observed_type)
+    return bool(a and b and a != b)
 
 
 class SanctionsIndex:
@@ -104,6 +128,7 @@ class SanctionsIndex:
                 country=row.country_linked,
                 vessel_flag=row.vessel_flag,
                 designation_date=row.designation_date,
+                vessel_type=getattr(row, "vessel_type", None),
             )
             self.entities[entity.id] = entity
             if entity.imo and entity.entity_type == "vessel":
@@ -126,18 +151,31 @@ class SanctionsIndex:
     def fuzzy(self, name: str, entity_types: set[str] | None = None, min_similarity: float = 0.88, limit: int = 5) -> list[tuple[IndexedEntity, float]]:
         normalized = normalize_name(name)
         tokens = _tokens(normalized)
-        if not normalized or not tokens:
+        if len(normalized) < 4 or not tokens:
             return []
+        # candidates from the rarest tokens first; very common tokens ("STAR", "OCEAN") only if nothing else
+        by_rarity = sorted(tokens, key=lambda t: len(self.token_index.get(t, ())))
         candidates: set[int] = set()
-        for token in tokens:
-            candidates |= self.token_index.get(token, set())
+        for token in by_rarity:
+            bucket = self.token_index.get(token, set())
+            if len(bucket) > MAX_TOKEN_FANOUT and candidates:
+                continue
+            candidates |= bucket
+            if len(candidates) >= MAX_CANDIDATES:
+                break
         scored = []
         for entity_id in candidates:
             entity = self.entities[entity_id]
             if entity_types and entity.entity_type not in entity_types:
                 continue
-            aliases = [a for a in [entity.normalized, *(normalize_name(x) for x in entity.aliases)] if a]
-            best = max(SequenceMatcher(None, normalized, alias).ratio() for alias in aliases)
+            best = 0.0
+            for alias in [entity.normalized, *(normalize_name(x) for x in entity.aliases)]:
+                if not alias or abs(len(alias) - len(normalized)) > max(4, len(normalized) // 3):
+                    continue
+                matcher = SequenceMatcher(None, normalized, alias, autojunk=False)
+                if matcher.quick_ratio() < min_similarity:  # cheap upper bound before the real ratio
+                    continue
+                best = max(best, matcher.ratio())
             if min_similarity <= best < 1.0:
                 scored.append((entity, best))
         scored.sort(key=lambda item: item[1], reverse=True)
@@ -174,10 +212,10 @@ class SanctionsIndex:
         if getattr(vessel, "name", None):
             vessel_imo = getattr(vessel, "imo", None)
             for entity in self.exact(vessel.name, {"vessel"}):
-                confidence = self._name_confidence(entity, flag, vessel_imo, vessel.name, exact=True)
+                confidence = self._name_confidence(entity, flag, vessel_imo, vessel.name, exact=True, observed_type=getattr(vessel, "ship_type", None))
                 add(self._match(entity, "name_exact", vessel.name, confidence, "direct_match", similarity=1.0))
             for entity, score in self.fuzzy(vessel.name, {"vessel"}, fuzzy_min_similarity):
-                confidence = self._name_confidence(entity, flag, vessel_imo, vessel.name, exact=False)
+                confidence = self._name_confidence(entity, flag, vessel_imo, vessel.name, exact=False, observed_type=getattr(vessel, "ship_type", None))
                 add(self._match(entity, "name_fuzzy", vessel.name, confidence, "direct_match", similarity=round(score, 3)))
         for attribute, match_type, base in (("owner_name", "owner", 0.6), ("registered_operator", "operator", 0.6), ("beneficial_owner", "beneficial_owner", 0.4)):
             value = getattr(vessel, attribute, None)
@@ -206,7 +244,7 @@ class SanctionsIndex:
         return matches
 
     @staticmethod
-    def _name_confidence(entity: IndexedEntity, flag: str | None, vessel_imo: str | None, name: str, exact: bool) -> float:
+    def _name_confidence(entity: IndexedEntity, flag: str | None, vessel_imo: str | None, name: str, exact: bool, observed_type: str | None = None) -> float:
         """Name matches are weak on their own: flags and (above all) IMO numbers decide.
 
         * listed flag agrees        exact 0.90 / fuzzy 0.70
@@ -223,6 +261,8 @@ class SanctionsIndex:
             confidence = 0.55 if exact else 0.35  # review queue: same name, different flag, no IMO to decide
         if entity.imo and vessel_imo and entity.imo != vessel_imo:
             confidence = min(confidence, 0.3)
+        elif types_conflict(entity.vessel_type, observed_type):
+            confidence = min(confidence, 0.35)
         elif not vessel_imo and len(normalize_name(name)) <= 6:
             confidence = min(confidence, 0.5)
         return round(confidence, 2)

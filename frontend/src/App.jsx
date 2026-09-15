@@ -1,44 +1,56 @@
+import { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Navigation from './components/common/Navigation';
 import ClassificationBanner from './components/common/ClassificationBanner';
 import ErrorBoundary from './components/common/ErrorBoundary';
-import Dashboard from './pages/Dashboard';
-import MarketAnalysis from './pages/MarketAnalysis';
-import Maritime from './pages/Maritime';
-import Sanctions from './pages/Sanctions';
-import VesselDetail from './pages/VesselDetail';
-import AuditLogPage from './pages/AuditLogPage';
-import Settings from './pages/Settings';
+import LoadingSpinner from './components/common/LoadingSpinner';
+import { useFetch } from './hooks/useFetch';
+
+// Pages are code-split so the map/chart libraries load only when needed.
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const MarketAnalysis = lazy(() => import('./pages/MarketAnalysis'));
+const Maritime = lazy(() => import('./pages/Maritime'));
+const VesselDetail = lazy(() => import('./pages/VesselDetail'));
+const Sanctions = lazy(() => import('./pages/Sanctions'));
+const Correlation = lazy(() => import('./pages/Correlation'));
+const AuditLogPage = lazy(() => import('./pages/AuditLogPage'));
+const Settings = lazy(() => import('./pages/Settings'));
 
 function App() {
+  const { data: config } = useFetch('/api/admin/config', 0);
+  const marking = config?.classification?.banner;
+
   return (
     <BrowserRouter>
       <div className="min-h-screen bg-cream flex flex-col">
-        <ClassificationBanner />
+        <ClassificationBanner level={marking} />
         <Navigation />
         <main className="container mx-auto p-6 flex-1 w-full">
           <ErrorBoundary>
-            <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/market" element={<MarketAnalysis />} />
-              <Route path="/maritime" element={<Maritime />} />
-              <Route path="/maritime/vessel/:mmsi" element={<VesselDetail />} />
-              <Route path="/audit" element={<AuditLogPage />} />
-              <Route path="/sanctions" element={<Sanctions />} />
-              <Route path="/settings" element={<Settings />} />
-            </Routes>
+            <Suspense fallback={<LoadingSpinner label="Loading" />}>
+              <Routes>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/market" element={<MarketAnalysis />} />
+                <Route path="/maritime" element={<Maritime />} />
+                <Route path="/maritime/vessel/:mmsi" element={<VesselDetail />} />
+                <Route path="/sanctions" element={<Sanctions />} />
+                <Route path="/correlation" element={<Correlation />} />
+                <Route path="/audit" element={<AuditLogPage />} />
+                <Route path="/settings" element={<Settings />} />
+              </Routes>
+            </Suspense>
           </ErrorBoundary>
         </main>
         <footer className="border-t border-gray-200 bg-white text-xs text-gray-500 no-print">
           <div className="container mx-auto px-6 py-3 flex flex-wrap gap-x-6 gap-y-1 justify-between">
             <span>VELES OSINT Intelligence Platform</span>
             <span>
-              Data: Binance, Kraken, Coinbase, Yahoo Finance, AIS providers, OFAC / EU / UN sanctions lists,
-              &copy; OpenStreetMap contributors
+              Data: Binance, Kraken, Coinbase, Yahoo Finance; AIS: Fintraffic Digitraffic (CC BY 4.0) and configured providers; OFAC SDN, EU consolidated list,
+              UN Security Council list; &copy; OpenStreetMap contributors
             </span>
           </div>
         </footer>
-        <ClassificationBanner />
+        <ClassificationBanner level={marking} />
       </div>
     </BrowserRouter>
   );

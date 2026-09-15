@@ -70,7 +70,8 @@ def parse_sdn(sdn_text: str, alt_text: str = "") -> list[SanctionedEntityRecord]
                 vessel_flag=flag,
                 vessel_owner=vess_owner,
                 call_sign=call_sign,
-                remarks=(f"{vess_type}; " if vess_type else "") + (remarks or "") or None,
+                vessel_type=vess_type,
+                remarks=remarks,
                 source_url=SOURCE_URL,
             )
         )

@@ -19,12 +19,13 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import Any
 
-from sqlalchemy import delete, func, or_, select
+from sqlalchemy import delete, func, insert, or_, select
 from sqlalchemy.orm import Session
 
 from app.analysis import evasion, ports as port_rules, transshipment as sts
-from app.analysis.geospatial import describe_location, lanes_containing, zones_containing
+from app.analysis.geospatial import describe_location, lanes_containing, port_containing, zones_containing
 from app.analysis.risk import compute_risk_score
+from app import notifications
 from app.api.stream import manager as stream
 from app.bots.sanctions import sanctions_bot
 from app.config import settings
@@ -59,6 +60,7 @@ class MaritimeBot:
         self.last_sanctions_check_at: datetime | None = None
         self.last_index_seen: datetime | None = None
         self.touched: set[int] = set()  # vessel ids changed since the last risk-score pass
+        self._last_history: dict[str, datetime] = {}  # mmsi -> timestamp of the last stored history fix
 
     # ------------------------------------------------------------------ config
     @staticmethod
@@ -100,6 +102,10 @@ class MaritimeBot:
                     receiver = rtlsdr_receiver.NMEAUDPReceiver(port=int(entry.get("udp_port", settings.RTL_AIS_UDP_PORT)))
                     await receiver.start()
                     self.sources[kind] = receiver
+                elif kind == "nmea_tcp":
+                    client = rtlsdr_receiver.NMEATCPClient(entry.get("host", "153.44.253.27"), int(entry.get("port", 5631)), entry.get("source", "nmea_tcp"))
+                    await client.start()
+                    self.sources[kind] = client
             except Exception as exc:  # noqa: BLE001
                 self.source_errors[kind] = str(exc)
                 log.error("{} source init failed: {}", kind, exc)
@@ -146,12 +152,27 @@ class MaritimeBot:
     def _ingest(self, positions: list[AISPosition], cfg: dict[str, Any]) -> dict[str, int]:
         """Upsert vessels/positions and run the per-report detectors."""
         gap_hours = float(cfg.get("ais_gap_threshold_hours", 6))
+        history_interval = timedelta(minutes=float(cfg.get("history_interval_minutes", 60)))
+        slow_interval = timedelta(minutes=float(cfg.get("history_slow_interval_minutes", 10)))
+        risk_floor = float(cfg.get("history_risk_floor", 0.3))
         # newest report per MMSI wins
         latest: dict[str, AISPosition] = {}
         for position in positions:
             current = latest.get(position.mmsi)
             if current is None or position.timestamp > current.timestamp:
                 latest[position.mmsi] = position
+        # slow vessels with another slow vessel within ~1 km: the only ones whose track can time a rendezvous
+        cell = 0.01
+        slow_cells: dict[tuple[int, int], int] = defaultdict(int)
+        for position in latest.values():
+            if position.speed is not None and position.speed <= 2.0:
+                slow_cells[(int(position.lat // cell), int(position.lon // cell))] += 1
+        rendezvous_candidates = {
+            position.mmsi
+            for position in latest.values()
+            if position.speed is not None and position.speed <= 2.0
+            and sum(slow_cells.get((int(position.lat // cell) + dr, int(position.lon // cell) + dc), 0) for dr in (-1, 0, 1) for dc in (-1, 0, 1)) > 1
+        }
         stats = defaultdict(int)
         updates: list[dict] = []
         lane_checks: list[tuple[Vessel, AISPosition]] = []
@@ -162,27 +183,20 @@ class MaritimeBot:
             for start in range(0, len(mmsis), 500):
                 for vessel in db.execute(select(Vessel).where(Vessel.mmsi.in_(mmsis[start : start + 500]))).scalars():
                     vessels[vessel.mmsi] = vessel
-            imo_map: dict[str, Vessel] = {}
-            wanted_imos = [p.imo for p in latest.values() if p.imo and p.mmsi not in vessels]
-            for start in range(0, len(wanted_imos), 500):
-                for vessel in db.execute(select(Vessel).where(Vessel.imo.in_(wanted_imos[start : start + 500]))).scalars():
-                    imo_map[vessel.imo] = vessel
+            # every vessel currently holding an IMO claimed in this batch (uniqueness is enforced by the DB)
+            imo_owner: dict[str, Vessel] = {}
+            claimed_imos = list({p.imo for p in latest.values() if p.imo})
+            for start in range(0, len(claimed_imos), 500):
+                for vessel in db.execute(select(Vessel).where(Vessel.imo.in_(claimed_imos[start : start + 500]))).scalars():
+                    imo_owner[vessel.imo] = vessel
 
-            new_rows: list[VesselPosition] = []
+            new_rows: list[tuple[Vessel, AISPosition]] = []
+            reconcile: list[Vessel] = []
             new_vessels: list[Vessel] = []
             for mmsi, position in latest.items():
                 vessel = vessels.get(mmsi)
                 if vessel is None:
                     vessel = Vessel(mmsi=mmsi, name=position.name or f"MMSI {mmsi}", flag_state=position.flag or "XX", sanctioned_status="clear")
-                    conflict = imo_map.get(position.imo) if position.imo else None
-                    if conflict is not None:
-                        indicator = evasion.identity_conflict(conflict, position)
-                        self._add_evasion(db, conflict, indicator)
-                        vessel.historical_names = [conflict.name]
-                        vessel.historical_flags = [conflict.flag_state]
-                        vessel.owner_name, vessel.registered_operator, vessel.beneficial_owner = conflict.owner_name, conflict.registered_operator, conflict.beneficial_owner
-                        conflict.imo = None  # the hull now reports under the new MMSI; keep uniqueness intact
-                        stats["identity_conflicts"] += 1
                     db.add(vessel)
                     new_vessels.append(vessel)
                     vessels[mmsi] = vessel
@@ -205,10 +219,15 @@ class MaritimeBot:
                     if gap:
                         self._add_evasion(db, vessel, gap)
                         stats["ais_gaps"] += 1
+                    anomaly = evasion.detect_position_anomaly(vessel.last_ais_update, vessel.current_position_lat, vessel.current_position_lon, position, position.ship_type or vessel.ship_type)
+                    if anomaly:
+                        self._add_evasion(db, vessel, anomaly)
+                        stats["position_anomalies"] += 1
 
                 # static enrichment (never overwrite a known value with nothing)
-                if position.imo and not vessel.imo and position.imo not in imo_map:
-                    vessel.imo = position.imo
+                if position.imo and not vessel.imo and self._claim_imo(db, vessel, position, imo_owner, stats):
+                    if vessel.id is not None and (vessel.sanctioned_status or "clear") != "clear":
+                        reconcile.append(vessel)
                 if position.call_sign and not vessel.call_sign:
                     vessel.call_sign = position.call_sign
                 if position.ship_type and (not vessel.ship_type or vessel.ship_type == "Other"):
@@ -220,22 +239,36 @@ class MaritimeBot:
                 vessel.ais_status = position.nav_status
                 vessel.last_ais_update = position.timestamp
                 vessel.ais_source = position.source
-                new_rows.append(
-                    VesselPosition(
-                        vessel=vessel, mmsi=mmsi, timestamp=position.timestamp, latitude=position.lat, longitude=position.lon,
-                        heading=position.heading, speed=position.speed, course=position.course, ais_source=position.source, signal_quality=position.signal_quality,
-                    )
-                )
+                if self._keep_history(vessel, position, history_interval, risk_floor, slow_interval if mmsi in rendezvous_candidates else None):
+                    new_rows.append((vessel, position))
+                    self._last_history[mmsi] = position.timestamp
+                else:
+                    stats["history_skipped"] += 1
                 lane_checks.append((vessel, position))
                 if vessel.id:
                     self.touched.add(vessel.id)
                 updates.append({"mmsi": mmsi, "name": vessel.name, "lat": position.lat, "lon": position.lon, "speed": position.speed, "heading": position.heading,
                                 "flag": vessel.flag_state, "sanctioned_status": vessel.sanctioned_status, "timestamp": position.timestamp})
-            db.add_all(new_rows)
             db.flush()
+            if new_rows:
+                db.execute(
+                    insert(VesselPosition),
+                    [
+                        {"vessel_id": v.id, "mmsi": v.mmsi, "timestamp": pos.timestamp, "latitude": pos.lat, "longitude": pos.lon, "heading": pos.heading,
+                         "speed": pos.speed, "course": pos.course, "ais_source": pos.source, "signal_quality": pos.signal_quality, "created_at": utcnow()}
+                        for v, pos in new_rows
+                    ],
+                )
+            for vessel in reconcile:
+                self._reconcile_breaches(db, vessel, stats)
             for vessel in new_vessels:
                 self.touched.add(vessel.id)
                 breaches_found += self._screen_vessel(db, vessel)
+                first = latest[vessel.mmsi]
+                anomaly = evasion.detect_position_anomaly(None, None, None, first, vessel.ship_type)
+                if anomaly:
+                    self._add_evasion(db, vessel, anomaly)
+                    stats["position_anomalies"] += 1
             for vessel, position in lane_checks:
                 self._lane_events(db, vessel, position, stats)
             db.commit()
@@ -244,6 +277,78 @@ class MaritimeBot:
         if updates:
             stream.publish("vessel_positions", {"count": len(updates), "vessels": updates[:2000]})
         return dict(stats)
+
+    def _claim_imo(self, db: Session, vessel: Vessel, position: AISPosition, imo_owner: dict[str, Vessel], stats: dict) -> bool:
+        """Give ``vessel`` the reported IMO unless another MMSI holds it.
+
+        A holder silent for more than a day has re-registered: the identity (and
+        its history) transfers.  Two live transponders claiming one hull is
+        spoofing: the newcomer gets an ``identity_conflict`` indicator and no IMO.
+        """
+        imo = position.imo
+        holder = imo_owner.get(imo)
+        if holder is None or holder is vessel:
+            vessel.imo = imo
+            imo_owner[imo] = vessel
+            return True
+        indicator = evasion.identity_conflict(holder, position)
+        holder_silent = holder.last_ais_update is None or (position.timestamp - holder.last_ais_update) > timedelta(hours=24)
+        if holder_silent:
+            self._add_evasion(db, holder, indicator)
+            vessel.historical_names = [*(vessel.historical_names or []), holder.name][-10:]
+            vessel.historical_flags = [*(vessel.historical_flags or []), holder.flag_state][-10:]
+            vessel.owner_name = vessel.owner_name or holder.owner_name
+            vessel.registered_operator = vessel.registered_operator or holder.registered_operator
+            vessel.beneficial_owner = vessel.beneficial_owner or holder.beneficial_owner
+            holder.imo = None
+            db.flush()  # release the unique value before re-assigning it
+            vessel.imo = imo
+            imo_owner[imo] = vessel
+            stats["identity_transfers"] += 1
+            return True
+        self._add_evasion(db, vessel if vessel.id else holder, indicator)
+        stats["identity_conflicts"] += 1
+        return False
+
+    def _keep_history(self, vessel: Vessel, position: AISPosition, interval: timedelta, risk_floor: float, slow_interval: timedelta | None = None) -> bool:
+        """Store a history row for vessels of interest every fix; rendezvous candidates every ``slow_interval``; sample the rest."""
+        if vessel.id is None or (vessel.sanctioned_status or "clear") != "clear" or (vessel.risk_score or 0) >= risk_floor:
+            return True
+        last = self._last_history.get(vessel.mmsi)
+        if slow_interval is not None and port_containing(position.lat, position.lon) is None:
+            return last is None or position.timestamp - last >= slow_interval
+        if interval.total_seconds() <= 0:
+            return False
+        return last is None or position.timestamp - last >= interval
+
+    def _reconcile_breaches(self, db: Session, vessel: Vessel, stats: dict) -> None:
+        """A newly learned IMO settles name-only matches: clear those whose listed IMO differs."""
+        index = sanctions_bot.index
+        if index is None or not vessel.imo:
+            return
+        remaining: list[SanctionsBreach] = []
+        for breach in list(vessel.breaches):
+            if breach.investigation_status == "cleared":
+                continue
+            evidence = breach.supporting_evidence or {}
+            entity = index.entities.get(breach.sanctioned_entity_id) if breach.sanctioned_entity_id else None
+            if evidence.get("match_type") in ("name_exact", "name_fuzzy") and entity and entity.imo and entity.imo != vessel.imo:
+                breach.investigation_status = "cleared"
+                breach.analyst_notes = f"Auto-cleared: vessel IMO {vessel.imo} differs from listed IMO {entity.imo} (namesake)"
+                db.add(AuditLog(action_type="cleared", user_id="system", vessel_id=vessel.id, breach_id=breach.id, sanctioned_entity_name=breach.sanctioned_entity_name,
+                                sanctioning_authorities=[breach.sanctioning_authority], rationale=breach.analyst_notes, source_systems=["bots.maritime"], created_by="system"))
+                stats["breaches_auto_cleared"] += 1
+            else:
+                remaining.append(breach)
+        visible = [b for b in remaining if (b.match_confidence or 0) >= float(self.config().get("min_visible_confidence", 0.6))]
+        if visible:
+            vessel.sanctioned_status = f"breach_{max(visible, key=lambda b: b.match_confidence or 0).sanctioning_authority.lower()}"
+        elif remaining:
+            vessel.sanctioned_status = "flagged"
+        else:
+            vessel.sanctioned_status = "clear"
+        # IMO now known: a direct identity match may exist
+        self._screen_vessel(db, vessel)
 
     def _lane_events(self, db: Session, vessel: Vessel, position: AISPosition, stats: dict) -> None:
         """Record chokepoint transits of risky vessels and any entry into sanctions/war zones."""
@@ -330,8 +435,9 @@ class MaritimeBot:
                 created += 1
                 if match.confidence >= visible_floor:
                     log.warning("BREACH {} {} ({}) - {} {:.2f}: {}", match.authority, vessel.name, vessel.mmsi, match.breach_type, match.confidence, match.summary)
-                    stream.publish("breach_detected", {"vessel_name": vessel.name, "mmsi": vessel.mmsi, "breach_type": match.breach_type, "authority": match.authority,
-                                                        "severity": match.severity, "confidence": match.confidence, "location": {"lat": vessel.current_position_lat, "lon": vessel.current_position_lon}})
+                    stream.publish("breach_detected", {"vessel_name": vessel.name, "mmsi": vessel.mmsi, "breach_type": match.breach_type, "authority": match.authority, "severity": match.severity, "confidence": match.confidence, "location": {"lat": vessel.current_position_lat, "lon": vessel.current_position_lon}})
+                    notifications.send_alert("breach", f"{match.authority} match: {vessel.name} ({vessel.flag_state})", match.summary, match.severity,
+                                             {"mmsi": vessel.mmsi, "imo": vessel.imo, "confidence": match.confidence, "location": breach.location_description})
             if match.confidence >= visible_floor and (best_visible is None or match.confidence > best_visible[0]):
                 best_visible = (match.confidence, match.authority)
         if best_visible:
@@ -341,6 +447,10 @@ class MaritimeBot:
         return created
 
     async def check_sanctions(self, hours: int = 24) -> int:
+        """Runs the synchronous body in a worker thread so the bot loop keeps serving streams."""
+        return await asyncio.to_thread(self._check_sanctions_sync, hours)
+
+    def _check_sanctions_sync(self, hours: int = 24) -> int:
         """Re-screen vessels active in the last ``hours`` (all vessels after a list refresh)."""
         index = sanctions_bot.index
         if index is None:
@@ -359,6 +469,10 @@ class MaritimeBot:
 
     # ----------------------------------------------------------- transshipment
     async def detect_transshipments(self) -> int:
+        """Runs the synchronous body in a worker thread so the bot loop keeps serving streams."""
+        return await asyncio.to_thread(self._detect_transshipments_sync)
+
+    def _detect_transshipments_sync(self) -> int:
         cfg = self.config()
         proximity = float(cfg.get("transshipment_proximity_meters", 500))
         min_duration = int(cfg.get("transshipment_min_duration_minutes", 30))
@@ -399,6 +513,8 @@ class MaritimeBot:
                 self.touched.update({a.id, b.id})
                 created += 1
                 log.warning("STS candidate ({:.2f}): {}", candidate.confidence, candidate.summary)
+                notifications.send_alert("transshipment", f"Ship-to-ship candidate: {a.name} & {b.name}", candidate.summary, "high" if candidate.confidence >= 0.7 else "medium",
+                                         {"vessel_a": a.mmsi, "vessel_b": b.mmsi, "confidence": candidate.confidence})
                 stream.publish("transshipment_detected", {"vessel_a": {"mmsi": a.mmsi, "name": a.name}, "vessel_b": {"mmsi": b.mmsi, "name": b.name},
                                                           "proximity_meters": candidate.distance_m, "duration_minutes": candidate.duration_minutes,
                                                           "location": {"lat": candidate.lat, "lon": candidate.lon}, "confidence": candidate.confidence})
@@ -408,6 +524,10 @@ class MaritimeBot:
 
     # ------------------------------------------------------------- port calls
     async def detect_port_calls(self) -> dict[str, int]:
+        """Runs the synchronous body in a worker thread so the bot loop keeps serving streams."""
+        return await asyncio.to_thread(self._detect_port_calls_sync)
+
+    def _detect_port_calls_sync(self) -> dict[str, int]:
         cfg = self.config()
         unusual = float(cfg.get("unusual_dwell_time_hours", 72))
         now = utcnow()
@@ -452,6 +572,10 @@ class MaritimeBot:
 
     # ------------------------------------------------------------ dark vessels
     async def detect_dark_vessels(self) -> int:
+        """Runs the synchronous body in a worker thread so the bot loop keeps serving streams."""
+        return await asyncio.to_thread(self._detect_dark_vessels_sync)
+
+    def _detect_dark_vessels_sync(self) -> int:
         threshold = float(self.config().get("ais_gap_threshold_hours", 6))
         now = utcnow()
         created = 0
@@ -474,6 +598,10 @@ class MaritimeBot:
 
     # -------------------------------------------------------------- risk score
     async def update_risk_scores(self, limit: int = 2000) -> int:
+        """Runs the synchronous body in a worker thread so the bot loop keeps serving streams."""
+        return await asyncio.to_thread(self._update_risk_scores_sync, limit)
+
+    def _update_risk_scores_sync(self, limit: int = 2000) -> int:
         ids = list(self.touched)[:limit]
         self.touched.difference_update(ids)
         if not ids:
@@ -488,21 +616,26 @@ class MaritimeBot:
 
     # ----------------------------------------------------------------- cleanup
     async def cleanup_old_data(self) -> dict[str, int]:
+        """Runs the synchronous body in a worker thread so the bot loop keeps serving streams."""
+        return await asyncio.to_thread(self._cleanup_old_data_sync)
+
+    def _cleanup_old_data_sync(self) -> dict[str, int]:
         retention = config_store.get_config().get("retention", {})
         days = int(retention.get("vessel_positions_days", 180))
         compress_after = int(retention.get("vessel_positions_compress_after_days", 7))
         now = utcnow()
         with SessionLocal() as db:
             purged = db.execute(delete(VesselPosition).where(VesselPosition.timestamp < now - timedelta(days=days))).rowcount or 0
-            # thin positions older than compress_after to one per 10 minutes per vessel
+            # thin positions older than compress_after to one per N minutes per vessel
             thinned = 0
+            thin_interval = timedelta(minutes=int(retention.get("vessel_positions_compress_interval_minutes", 30)))
             cutoff = now - timedelta(days=compress_after)
             rows = db.execute(select(VesselPosition.id, VesselPosition.vessel_id, VesselPosition.timestamp).where(VesselPosition.timestamp < cutoff).order_by(VesselPosition.vessel_id, VesselPosition.timestamp)).all()
             last_kept: dict[int, datetime] = {}
             to_delete = []
             for row_id, vessel_id, timestamp in rows:
                 kept = last_kept.get(vessel_id)
-                if kept and (timestamp - kept) < timedelta(minutes=10):
+                if kept and (timestamp - kept) < thin_interval:
                     to_delete.append(row_id)
                 else:
                     last_kept[vessel_id] = timestamp

@@ -3,7 +3,11 @@
 from datetime import timedelta
 from typing import Any
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query
+import csv
+import io
+from typing import Literal
+
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response
 from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session
 
@@ -24,7 +28,10 @@ from app.schemas.market import (
     PricesResponse,
     VolatilityResponse,
 )
+from app.reports.intelligence import market_report
+from app.reports.pdf import build_pdf
 from app.utils import config_store
+from app.utils.serialization import jsonable
 from app.utils.time import utcnow
 
 router = APIRouter(tags=["market"])
@@ -257,6 +264,32 @@ def update_market_config(
     )
     db.commit()
     return merged["market"]
+
+
+@router.get("/export/{timerange}")
+def export_market_report(timerange: str, format: Literal["json", "pdf", "csv"] = "json", classification: str = Query("UNCLASSIFIED", max_length=50), db: Session = Depends(get_db)):
+    """Market intelligence brief for ``24h`` / ``7d`` / ``30d`` as JSON, PDF or CSV (alerts), audited as an export."""
+    unit = timerange[-1]
+    try:
+        amount = int(timerange[:-1])
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="timerange like 24h, 7d or 30d") from exc
+    end = utcnow()
+    start = end - (timedelta(days=amount) if unit == "d" else timedelta(hours=amount))
+    report, data = market_report(db, start, end, classification)
+    db.add(AuditLog(action_type="export", user_id="anonymous", rationale=f"Market intelligence brief ({format}, {timerange})", supporting_data={"format": format, "classification": classification}, source_systems=["api.market"], created_by="anonymous"))
+    db.commit()
+    stamp = end.strftime("%Y-%m-%d")
+    if format == "pdf":
+        return Response(build_pdf(report), media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=VELES_Market_Brief_{stamp}.pdf"})
+    if format == "csv":
+        buffer = io.StringIO()
+        writer = csv.writer(buffer)
+        writer.writerow(["timestamp", "asset", "type", "severity", "exchanges", "change_percent", "confidence", "acknowledged", "summary"])
+        for a in data["alerts"]:
+            writer.writerow([a["timestamp"], a["asset"], a["type"], a["severity"], ";".join(a["exchanges"] or []), a["change_percent"], a["confidence"], a["acknowledged"], a["summary"]])
+        return Response(buffer.getvalue(), media_type="text/csv", headers={"Content-Disposition": f"attachment; filename=VELES_Market_Alerts_{stamp}.csv"})
+    return jsonable(data)
 
 
 @router.get("/status", response_model=BotStatus)

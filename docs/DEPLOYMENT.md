@@ -21,7 +21,7 @@ npm run dev                    # http://localhost:5173, /api proxied to :8000
 
 `uv` users: `uv venv venv && uv pip install --python venv/Scripts/python.exe -r requirements.txt`.
 
-Tests: `cd backend && venv/Scripts/python -m pytest`.
+Tests: `cd backend && venv/Scripts/python -m pytest` (47 tests, no network).
 
 Single-process option: `npm run build` once, then `python run.py` serves the
 built UI at `http://localhost:8000` (no Vite needed).
@@ -59,6 +59,23 @@ sudo systemctl restart veles
 | Inspect DB | `sqlite3 backend/veles.db ".tables"` |
 | Apply migrations manually | `cd backend && venv/bin/alembic upgrade head` (also runs automatically at startup) |
 | Health | `curl http://localhost/api/health` |
+
+### Watchdog (optional)
+
+`deployment/health-check.py` restarts the service when `/api/health` fails or
+data goes stale. Add to root's crontab:
+
+```
+*/5 * * * * /usr/bin/python3 /home/pi/veles-osint/deployment/health-check.py --quiet >> /var/log/veles-watchdog.log 2>&1
+```
+
+### Keys and coverage
+
+Everything works keyless with Finnish-waters AIS. For global coverage add a
+free aisstream.io key; for alerts add a webhook or SMTP; to protect the API
+set a token - all in `backend/.env` (template: `.env.example`, details in
+[DATA_SOURCES.md](DATA_SOURCES.md) and [SECURITY.md](SECURITY.md)). Restart
+after editing `.env`.
 
 ### Remote access
 

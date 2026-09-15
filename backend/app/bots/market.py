@@ -22,6 +22,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session
 
+from app import notifications
 from app.analysis.common import candles_to_frame
 from app.analysis.coordination import Coordination, detect_cross_exchange_coordination
 from app.analysis.liquidation import correlate_with_events, detect_cascades
@@ -212,6 +213,7 @@ class MarketBot:
             )
         )
         log.warning("{} {} [{}] {}", asset, anomaly.type, anomaly.severity, anomaly.summary)
+        notifications.send_alert("market", f"{asset} {anomaly.type.replace('_', ' ')} on {anomaly.exchange}", anomaly.summary, anomaly.severity, {"asset": asset, "price": anomaly.price})
         return True
 
     async def analyze_coordination(self) -> int:
@@ -273,6 +275,7 @@ class MarketBot:
             )
         )
         log.warning("{} coordination [{}] {}", event.asset, severity, event.summary)
+        notifications.send_alert("coordination", f"{event.asset} cross-exchange coordination", event.summary, severity, {"exchanges": event.exchanges, "confidence": event.confidence})
         return True
 
     async def analyze_liquidations(self) -> int:

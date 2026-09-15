@@ -1,0 +1,8 @@
+[flake8]
+max-line-length = 200
+exclude = venv,__pycache__,.pytest_cache
+extend-ignore = E203,W503,E501
+per-file-ignores =
+    migrations/versions/*.py:E128,E122,W291,F401
+    migrations/env.py:E402
+    app/data/mid.py:E702

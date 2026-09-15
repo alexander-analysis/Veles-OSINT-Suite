@@ -2,8 +2,12 @@
 
 Base URL: `http://<host>:8000` (or through Nginx on port 80). Interactive
 docs: `/docs` (Swagger UI) and `/redoc`. All timestamps are UTC ISO-8601 with
-a `Z` suffix. No authentication in the MVP - restrict access at the network /
-Cloudflare Access layer.
+a `Z` suffix.
+
+**Authentication**: open by default. When `VELES_API_TOKEN` is set in
+`backend/.env`, every `/api/*` call except `/api/health` must send
+`X-API-Key: <token>` (or `Authorization: Bearer <token>`; WebSocket clients
+use `?access_token=<token>`); otherwise **401**.
 
 ## Health
 
@@ -38,6 +42,7 @@ the database is unreachable.
 | `GET /history/{asset}?hours=6&timeframe=1m&exchanges=binance,kraken` | Candles pivoted by exchange + `composite`; `timeframe` in `1m,5m,15m,1h,4h,1d` is resampled server-side; includes `anomalies_in_period` |
 | `GET /volatility/{asset}?hours=24&window_minutes=15` | Realised volatility per exchange (daily / annualised), `clusters` of sustained high volatility, rolling `series` |
 | `POST /config` `{"assets": ["BTC","ETH","SOL"], "price_anomaly_sigma": 2.5}` | Patch the `market` section of the configuration (audited; bots pick it up on their next run) |
+| `GET /export/{24h|7d|30d}?format=json|pdf|csv&classification=` | Market intelligence brief (audited export) |
 | `GET /status` | Bot runtime: last fetch, per-pair counts, candles stored, open alerts, liquidation stream state |
 
 Alert `severity` is derived from magnitude: price anomalies by sigma
@@ -56,14 +61,15 @@ total notional ($1M/$5M/$20M/$100M), coordination by confidence.
 | `GET /breaches?authority=&severity=&status=&breach_type=&min_confidence=` | Sanctions matches; `status` defaults to open (`flagged,investigating,escalated`), use `review` for the low-confidence queue or `all` |
 | `GET /breaches/{authority}` | All matches for OFAC / EU / UN |
 | `PATCH /breach/{id}` `{"investigation_status": "investigating|cleared|escalated", "analyst_notes": "..."}` | Audited status change; clearing recomputes the vessel status and risk |
-| `GET /evasion-patterns?event_type=&severity=&hours=` / `PATCH /evasion-patterns/{id}` | AIS gaps, renames, re-flagging, IMO conflicts, dark vessels |
+| `GET /evasion-patterns?event_type=&severity=&hours=` / `PATCH /evasion-patterns/{id}` | AIS gaps, renames, re-flagging, IMO conflicts, dark vessels, `position_anomaly` (impossible speed/jump - spoofing) |
 | `GET /transshipment?hours=&min_confidence=` / `PATCH /transshipment/{id}` | Ship-to-ship rendezvous candidates |
 | `GET /port-calls?hours=&port=&risk=&only_flagged=&open_only=` and `GET /port-calls/{24h|7d|30d}` | Port calls with dwell times and flags (`sanctioned_facility`, `unusual_dwell_time`, ...) plus per-port totals |
 | `GET /ports` | Curated port reference as GeoJSON |
 | `GET /sanctions-zones` | Monitoring zones as GeoJSON, grouped `ofac` / `eu` / `un` / `other` / `all` |
 | `GET /shipping-lanes` / `GET /shipping-lanes/violations?hours=&context=` | Lanes/chokepoints GeoJSON; zone entries and chokepoint transits by high-risk vessels |
 | `GET /audit-log?start_date=&end_date=&action_type=&vessel_id=&user=&limit=&offset=` | Immutable compliance log; `GET /audit-log/actions` lists action types |
-| `POST /audit-log/export` `{"format": "json|csv", "action_type": ..., "classification": "CONFIDENTIAL"}` | Export (audited); `pdf` arrives in Phase 4 |
+| `POST /audit-log/export` `{"format": "json|csv|pdf", "start_date": ..., "include_sections": [...], "classification": "CONFIDENTIAL"}` | Export (audited): JSON/CSV of entries, or the PDF intelligence report |
+| `GET /report?days=7&format=json|pdf&classification=&sections=` | Maritime intelligence report: executive summary, breach analysis, highest-risk vessels, evasion, STS, port activity, zone events, audit trail, recommendations |
 | `GET /status` | Bot status: sources, source errors (missing keys), last poll, counts, stream clients |
 | `WS /stream` | Frames: `hello`, `vessel_positions` (batched after every poll), `breach_detected`, `transshipment_detected` |
 
@@ -77,7 +83,7 @@ total notional ($1M/$5M/$20M/$100M), coordination by confidence.
 | `GET /vessel/{mmsi}` | Recorded breaches + live screen + recommendation |
 | `GET /updates?timeframe=7&authority=&type=` | Change log since the last refreshes with per-authority summary |
 | `GET /programs?authority=` | Programme counts |
-| `GET /report/{7days|30days|24h}` | JSON activity report |
+| `GET /report/{7days|30days|24h}?format=json|pdf` | Activity report (JSON or PDF) |
 | `GET /status` / `POST /refresh?authority=OFAC,EU` | Bot status; trigger a refresh (202) |
 
 ## Admin (`/api/admin`)

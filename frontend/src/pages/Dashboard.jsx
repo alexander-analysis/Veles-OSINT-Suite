@@ -1,9 +1,10 @@
 import { Link } from 'react-router-dom';
-import { TrendingUp, Ship, Activity, Database, Clock } from 'lucide-react';
+import { TrendingUp, Ship, Activity, Database, Clock, ShieldAlert, FileDown, AlertTriangle } from 'lucide-react';
 import PageHeader from '../components/common/PageHeader';
 import StatusBadge from '../components/common/StatusBadge';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { useFetch } from '../hooks/useFetch';
+import { downloadFile } from '../services/api';
 
 function formatUptime(seconds) {
   if (seconds == null) return '-';
@@ -18,61 +19,47 @@ function formatBytes(bytes) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-function formatTime(iso) {
-  return iso ? new Date(iso).toLocaleString() : 'no data yet';
-}
+const time = (iso) => (iso ? new Date(iso).toLocaleString() : 'no data yet');
 
-function StatCard({ icon: Icon, title, value, detail, tone }) {
-  const label = tone === 'ok' ? 'healthy' : tone === 'warn' ? 'attention' : 'down';
-  return (
-    <div className="card">
+function Tile({ icon: Icon, title, value, detail, tone, to }) {
+  const body = (
+    <div className="card h-full">
       <div className="flex items-center justify-between">
         <span className="card-title">{title}</span>
         <Icon size={16} className="text-gray-400" aria-hidden="true" />
       </div>
       <div className="mt-2 flex items-center gap-2">
         <span className="text-xl font-semibold">{value}</span>
-        {tone && <StatusBadge tone={tone}>{label}</StatusBadge>}
+        {tone && <StatusBadge tone={tone}>{tone === 'ok' ? 'healthy' : tone === 'warn' ? 'attention' : tone === 'error' ? 'alert' : 'idle'}</StatusBadge>}
       </div>
       {detail && <div className="mt-1 text-xs text-gray-500">{detail}</div>}
     </div>
   );
+  return to ? <Link to={to} className="block hover:opacity-90">{body}</Link> : body;
 }
 
-function ModuleCard({ icon: Icon, title, phase, to, lastUpdate, description }) {
-  return (
-    <div className="card flex flex-col">
-      <div className="flex items-center justify-between">
-        <span className="flex items-center gap-2 font-medium">
-          <Icon size={18} className="text-steel-600" aria-hidden="true" />
-          {title}
-        </span>
-        <StatusBadge tone={lastUpdate ? 'ok' : 'neutral'}>{lastUpdate ? 'live' : phase}</StatusBadge>
-      </div>
-      <p className="mt-2 text-sm text-gray-600 flex-1">{description}</p>
-      <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
-        <span className="flex items-center gap-1">
-          <Clock size={12} aria-hidden="true" /> Last data: {formatTime(lastUpdate)}
-        </span>
-        <Link to={to} className="text-steel-600 hover:underline">
-          Open &rarr;
-        </Link>
-      </div>
-    </div>
-  );
-}
+const SIGNIFICANT = 'breach_detected,transshipment_detected,high_risk_port_call,escalated,cleared,sanctions_list_refreshed,alert_acknowledged,export,config_updated';
 
 export default function Dashboard() {
   const { data: health, error, loading, updatedAt } = useFetch('/api/health', 15000);
+  const { data: alerts } = useFetch('/api/market/alerts?acknowledged=false&limit=5&severity=high,critical', 30000);
+  const { data: breaches } = useFetch('/api/maritime/breaches?limit=5', 30000);
+  const { data: events } = useFetch(`/api/maritime/audit-log?action_type=${SIGNIFICANT}&limit=12`, 30000);
+  const market = health?.bots?.market;
+  const maritime = health?.bots?.maritime;
+  const sanctions = health?.bots?.sanctions;
+  const listings = sanctions ? Object.values(sanctions.active_listings || {}).reduce((s, v) => s + v, 0) : 0;
   const backendTone = error ? 'error' : health?.status === 'ok' ? 'ok' : 'warn';
+
+  const report = (path, name) => downloadFile(path, name).catch((err) => alert(err.message));
 
   return (
     <div>
-      <PageHeader title="Intelligence Dashboard" subtitle="System status and module summary">
+      <PageHeader title="Intelligence Dashboard" subtitle="Live status across market, sanctions and maritime collection">
         {updatedAt && <span className="text-xs text-gray-500">Refreshed {updatedAt.toLocaleTimeString()}</span>}
       </PageHeader>
 
-      {loading && <LoadingSpinner label="Contacting backend" />}
+      {loading && !health && <LoadingSpinner label="Contacting backend" />}
       {error && (
         <div className="card border-red mb-6">
           <div className="card-title text-red-700">Backend unreachable</div>
@@ -80,53 +67,61 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4 mb-6">
-        <StatCard
-          icon={Activity}
-          title="Backend"
-          value={health ? `v${health.version}` : '-'}
-          detail={health ? `${health.environment} - up ${formatUptime(health.uptime_seconds)}` : undefined}
-          tone={health ? backendTone : undefined}
-        />
-        <StatCard
-          icon={Database}
-          title="Database"
-          value={health ? health.database.dialect : '-'}
-          detail={health ? formatBytes(health.database.size_bytes) : undefined}
-          tone={health ? (health.database.ok ? 'ok' : 'error') : undefined}
-        />
-        <StatCard
-          icon={Clock}
-          title="Scheduler"
-          value={health ? `${health.scheduler.jobs.length} jobs` : '-'}
-          detail={health ? (health.scheduler.running ? 'running' : 'stopped') : undefined}
-          tone={health ? (health.scheduler.running ? 'ok' : 'warn') : undefined}
-        />
-        <StatCard
-          icon={Activity}
-          title="Server time"
-          value={health ? new Date(health.timestamp).toLocaleTimeString() : '-'}
-          detail="UTC timestamps on all data"
-        />
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4 mb-4">
+        <Tile icon={Ship} title="Vessels tracked" value={maritime ? maritime.vessels_tracked.toLocaleString() : '-'} detail={maritime ? `${maritime.vessels_active_1h} active last hour - ${Object.keys(maritime.sources).join(', ') || 'no sources'}` : undefined} tone={maritime ? (maritime.vessels_active_1h ? 'ok' : 'warn') : undefined} to="/maritime" />
+        <Tile icon={ShieldAlert} title="Open sanctions breaches" value={maritime ? maritime.open_breaches : '-'} detail={sanctions ? `${listings.toLocaleString()} active listings indexed` : undefined} tone={maritime ? (maritime.open_breaches ? 'error' : 'ok') : undefined} to="/maritime" />
+        <Tile icon={TrendingUp} title="Open market alerts" value={market ? market.open_alerts : '-'} detail={market ? `${market.candles_stored.toLocaleString()} candles - last fetch ${market.last_fetch_at ? new Date(market.last_fetch_at).toLocaleTimeString() : '-'}` : undefined} tone={market ? (market.open_alerts ? 'warn' : 'ok') : undefined} to="/market" />
+        <Tile icon={Activity} title="Backend" value={health ? `v${health.version}` : '-'} detail={health ? `${health.environment} - up ${formatUptime(health.uptime_seconds)} - ${health.scheduler.jobs.length} jobs` : undefined} tone={health ? backendTone : undefined} />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <ModuleCard
-          icon={TrendingUp}
-          title="Market Intelligence"
-          phase="Phase 2"
-          to="/market"
-          lastUpdate={health?.last_market_update}
-          description="Multi-exchange price monitoring, 3-sigma anomaly detection, volume spikes and cross-exchange coordination patterns."
-        />
-        <ModuleCard
-          icon={Ship}
-          title="Maritime Intelligence"
-          phase="Phase 3"
-          to="/maritime"
-          lastUpdate={health?.last_ais_update}
-          description="AIS vessel tracking, OFAC / EU / UN sanctions cross-referencing, evasion and transshipment detection with an immutable audit trail."
-        />
+      <div className="grid gap-4 md:grid-cols-3 mb-6 text-xs">
+        <div className="card py-3"><div className="card-title flex items-center gap-1"><Database size={12} aria-hidden="true" /> Database</div><div className="mt-1">{health ? `${health.database.dialect} - ${formatBytes(health.database.size_bytes)}` : '-'}</div><div className="text-gray-500">market {time(health?.last_market_update)} - AIS {time(health?.last_ais_update)}</div></div>
+        <div className="card py-3"><div className="card-title flex items-center gap-1"><Clock size={12} aria-hidden="true" /> Streams</div><div className="mt-1">{maritime ? `${maritime.stream.clients} live map client(s), ${maritime.stream.messages_sent} frames` : '-'}</div><div className="text-gray-500">{market?.liquidation_stream?.connected ? 'Binance liquidation stream connected' : 'liquidation stream offline'}</div></div>
+        <div className="card py-3">
+          <div className="card-title flex items-center gap-1"><FileDown size={12} aria-hidden="true" /> Intelligence reports</div>
+          <div className="mt-1 flex flex-wrap gap-1">
+            <button type="button" onClick={() => report('/api/maritime/report?days=7&format=pdf', 'VELES_Maritime_Report.pdf')} className="px-2 py-0.5 border border-gray-300 rounded bg-white hover:bg-gray-100">Maritime 7d (PDF)</button>
+            <button type="button" onClick={() => report('/api/sanctions/report/7days?format=pdf', 'VELES_Sanctions_Report.pdf')} className="px-2 py-0.5 border border-gray-300 rounded bg-white hover:bg-gray-100">Sanctions 7d (PDF)</button>
+            <button type="button" onClick={() => report('/api/market/export/7d?format=pdf', 'VELES_Market_Brief.pdf')} className="px-2 py-0.5 border border-gray-300 rounded bg-white hover:bg-gray-100">Market 7d (PDF)</button>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-3">
+        <div className="card">
+          <div className="card-title mb-2 flex items-center gap-1"><ShieldAlert size={12} aria-hidden="true" /> Top sanctions matches</div>
+          {breaches?.breaches?.length ? (
+            <ul className="space-y-1 text-sm">
+              {breaches.breaches.map((b) => (
+                <li key={b.id}>
+                  <Link to={`/maritime/vessel/${b.mmsi}`} className="font-medium text-steel-700 hover:underline">{b.vessel_name}</Link>
+                  <span className="text-xs text-gray-500"> ({b.flag}) - {b.sanctioning_authority} {Math.round((b.match_confidence || 0) * 100)}% - {b.sanctioned_entity}</span>
+                </li>
+              ))}
+            </ul>
+          ) : <p className="text-sm text-gray-500">No open matches.</p>}
+        </div>
+        <div className="card">
+          <div className="card-title mb-2 flex items-center gap-1"><AlertTriangle size={12} aria-hidden="true" /> Unacknowledged market alerts</div>
+          {alerts?.alerts?.length ? (
+            <ul className="space-y-1 text-sm">
+              {alerts.alerts.map((a) => (
+                <li key={a.id}><span className="font-medium">{a.asset}</span> <span className="text-xs text-gray-500">{a.alert_type.replace('_', ' ')} - {a.severity} - {new Date(a.timestamp).toLocaleTimeString()}</span><div className="text-xs text-gray-600">{a.intelligence_summary}</div></li>
+              ))}
+            </ul>
+          ) : <p className="text-sm text-gray-500">No high/critical alerts pending.</p>}
+        </div>
+        <div className="card">
+          <div className="card-title mb-2 flex items-center gap-1"><Clock size={12} aria-hidden="true" /> Recent significant events</div>
+          {events?.entries?.length ? (
+            <ul className="space-y-1 text-xs">
+              {events.entries.map((e) => (
+                <li key={e.id}><span className="text-gray-500">{new Date(e.timestamp).toLocaleString()}</span> <span className="font-medium">{e.action_type.replace(/_/g, ' ')}</span> <span className="text-gray-500">by {e.user}</span><div className="text-gray-600 line-clamp-2">{e.rationale}</div></li>
+              ))}
+            </ul>
+          ) : <p className="text-sm text-gray-500">Nothing recorded yet.</p>}
+          <Link to="/audit" className="mt-2 inline-block text-xs text-steel-600 hover:underline">Open audit log &rarr;</Link>
+        </div>
       </div>
     </div>
   );

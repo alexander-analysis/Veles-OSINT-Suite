@@ -13,6 +13,7 @@ from typing import Any
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from app.auth import require_websocket_token
 from app.utils.logger import logger
 from app.utils.serialization import jsonable
 from app.utils.time import utcnow
@@ -72,6 +73,7 @@ manager = ConnectionManager()
 
 @router.websocket("/stream")
 async def stream(websocket: WebSocket) -> None:
+    await require_websocket_token(websocket)
     await manager.connect(websocket)
     try:
         while True:

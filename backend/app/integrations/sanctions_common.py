@@ -37,6 +37,7 @@ class SanctionedEntityRecord:
     imo: str | None = None
     vessel_flag: str | None = None
     vessel_owner: str | None = None
+    vessel_type: str | None = None
     call_sign: str | None = None
     addresses: list[str] = field(default_factory=list)
     un_committee: str | None = None

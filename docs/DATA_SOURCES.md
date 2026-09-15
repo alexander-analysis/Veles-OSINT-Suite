@@ -12,6 +12,7 @@ Credentials go in `backend/.env` (never committed). Source toggles live in
 | **aisstream.io** | Global (terrestrial + some satellite) | `AISSTREAM_API_KEY` - free key at https://aisstream.io | WebSocket; enabled in settings, activates when the key is present. Optional bounding boxes in `settings.yaml` (`bounding_boxes: [[[lat_min, lon_min], [lat_max, lon_max]]]`). |
 | **MarineTraffic** | Global, best quality | `MARINETRAFFIC_API_KEY` - paid (PS07 "vessel positions in area") | Set `enabled: true` and optionally a `bbox`. |
 | **AISHub** | Aggregated member feeds | `AISHUB_USERNAME` - free, but you must contribute a feed | Set `enabled: true`. |
+| **NMEA over TCP** (Kystverket Norway `153.44.253.27:5631`, or any NMEA stream) | Norwegian coast (~3,000 vessels) | none | `nmea_tcp` entry in `settings.yaml`; some networks block the port - test with `nc 153.44.253.27 5631`. |
 | **RTL-SDR / NMEA over UDP** | ~20-50 nm around the receiver | none (hardware) | `rtl_ais -n -h 127.0.0.1 -P 10110` or AIS-catcher `-u 127.0.0.1 10110`; set `enabled: true`. Highest-confidence source (`rtl_sdr`). Any NMEA-over-UDP feed works. |
 
 Source reliability is recorded on every position (`ais_source`) and

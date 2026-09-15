@@ -78,7 +78,7 @@ class LiquidationStream:
         delay = 5
         while True:
             try:
-                async with websockets.connect(LIQUIDATION_STREAM_URL, ping_interval=20, ping_timeout=20) as socket:
+                async with websockets.connect(LIQUIDATION_STREAM_URL, ping_interval=30, ping_timeout=90) as socket:
                     self.connected = True
                     delay = 5
                     log.info("binance liquidation stream connected")

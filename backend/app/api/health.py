@@ -5,6 +5,7 @@ from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from app import __version__
+from app.auth import auth_status
 from app.bots.maritime import maritime_bot
 from app.bots.market import market_bot
 from app.bots.sanctions import sanctions_bot
@@ -60,5 +61,5 @@ def health(response: Response, db: Session = Depends(get_db)) -> HealthResponse:
         scheduler=SchedulerHealth(enabled=settings.SCHEDULER_ENABLED, **scheduler_status()),
         last_market_update=last_market_update,
         last_ais_update=last_ais_update,
-        bots={"market": market_bot.status(), "maritime": maritime_bot.status(), "sanctions": {k: sanctions_bot.status()[k] for k in ("active_listings", "index_size", "refreshing")}} if db_ok else {},
+        bots={"market": market_bot.status(), "maritime": maritime_bot.status(), "sanctions": {k: sanctions_bot.status()[k] for k in ("active_listings", "index_size", "refreshing")}, "auth": auth_status()} if db_ok else {"auth": auth_status()},
     )

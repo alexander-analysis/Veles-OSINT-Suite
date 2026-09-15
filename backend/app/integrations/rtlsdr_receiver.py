@@ -11,7 +11,6 @@ party in the loop).
 """
 
 import asyncio
-from datetime import datetime
 
 from app.integrations.ais_common import AISPosition, NAV_STATUS, ship_type_name
 from app.utils.logger import logger
@@ -108,3 +107,64 @@ class _Protocol(asyncio.DatagramProtocol):
     def datagram_received(self, data: bytes, _addr) -> None:
         for line in data.decode("ascii", errors="ignore").splitlines():
             self.receiver.feed(line)
+
+
+class NMEATCPClient(NMEAUDPReceiver):
+    """Same decoder fed from a TCP NMEA stream (e.g. Kystverket 153.44.253.27:5631, or AIS-catcher's TCP output).
+
+    Reconnects with back-off; ``source`` is tagged ``nmea_tcp`` unless overridden.
+    """
+
+    def __init__(self, host: str, port: int, source: str = "nmea_tcp") -> None:
+        super().__init__(port=port, host=host)
+        self.source_name = source
+        self.connected = False
+        self._task: asyncio.Task | None = None
+
+    async def start(self) -> None:
+        try:
+            import pyais
+        except ImportError:
+            log.warning("pyais not installed - NMEA TCP client disabled")
+            return
+        self._decoder = pyais
+        if self._task is None or self._task.done():
+            self._task = asyncio.create_task(self._run(), name=f"nmea-tcp-{self.host}")
+
+    def stop(self) -> None:
+        if self._task:
+            self._task.cancel()
+        self.listening = False
+
+    def feed(self, line: str) -> None:
+        super().feed(line)
+        # re-tag the newest report with this stream's source name
+        mmsi = line and next(reversed(self.latest), None)
+        if mmsi and self.latest[mmsi].source == SOURCE:
+            self.latest[mmsi].source = self.source_name
+
+    async def _run(self) -> None:
+        delay = 5
+        while True:
+            writer = None
+            try:
+                reader, writer = await asyncio.wait_for(asyncio.open_connection(self.host, self.port), timeout=20)
+                self.connected = self.listening = True
+                delay = 5
+                log.info("NMEA TCP stream connected: {}:{}", self.host, self.port)
+                while True:
+                    raw = await asyncio.wait_for(reader.readline(), timeout=120)
+                    if not raw:
+                        raise ConnectionError("stream closed")
+                    self.feed(raw.decode("ascii", errors="ignore"))
+            except asyncio.CancelledError:
+                self.connected = self.listening = False
+                raise
+            except Exception as exc:  # noqa: BLE001
+                self.connected = self.listening = False
+                log.warning("NMEA TCP {}:{} error: {} - reconnecting in {}s", self.host, self.port, exc, delay)
+                await asyncio.sleep(delay)
+                delay = min(delay * 2, 300)
+            finally:
+                if writer is not None:
+                    writer.close()
