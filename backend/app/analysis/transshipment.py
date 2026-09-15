@@ -11,6 +11,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
+from app.analysis import landmask
 from app.analysis.geospatial import describe_location, haversine_m, nearest_port, zones_containing
 
 CARGO_TYPES = ("tanker", "cargo")  # typed hulls that plausibly transfer cargo
@@ -60,7 +61,7 @@ def find_proximity_pairs(vessels: list, proximity_meters: float, max_speed_knots
     """Pairs of slow, plausible cargo vessels within ``proximity_meters`` of each other and away from ports.
 
     Returns ``(a, b, distance_m, neighbours)`` tuples; ``neighbours`` is the number of slow vessels in the
-    surrounding ~6 km, the anchorage / marina density cue.  Untyped class-B craft rafted together in a
+    surrounding ~6 km, the anchorage / marina density cue.  Pairs on inland water (land mask) are dropped.  Untyped class-B craft rafted together in a
     marina and barges moored along inland waterways produced tens of thousands of false rendezvous, so a
     pair needs at least one typed tanker / cargo hull, and inside a dense cluster it needs a tanker and two
     typed hulls.
@@ -92,6 +93,8 @@ def find_proximity_pairs(vessels: list, proximity_meters: float, max_speed_knots
                 port = nearest_port(a.current_position_lat, a.current_position_lon, within_km=min_port_distance_km)
                 if port:
                     continue  # berthed side by side in port is not an STS transfer
+                if landmask.is_inland((a.current_position_lat + b.current_position_lat) / 2, (a.current_position_lon + b.current_position_lon) / 2):
+                    continue  # river, canal or lake traffic (barges rafted on the Rhine, the Elbe, Dutch canals)
                 seen.add((a.id, b.id))
                 pairs.append((a, b, distance, len(neighbours)))
     return pairs

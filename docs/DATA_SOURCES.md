@@ -48,6 +48,10 @@ fewer than half the known listings never delists anything.
   tagged with the applicable authorities, and shipping lanes / chokepoints.
 * `backend/app/data/mid.py` - ITU Maritime Identification Digits -> flag state.
 * `backend/app/data/countries.py` - country names used by OFAC/UN -> ISO codes.
+* `backend/app/data/ne_50m_land.json.gz` - Natural Earth 1:50m land polygons
+  (public domain), the land mask behind `app/analysis/landmask.py`: rivers,
+  canals and lakes count as land, so barge traffic on inland waterways is
+  never reported as a ship-to-ship transfer.
 
 Polygons are coarse by design; refine them for your area of interest.
 

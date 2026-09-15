@@ -75,6 +75,10 @@ def test_transshipment_pairs_duration_and_assessment():
     moored = VesselStub(mmsi="M1", current_position_lat=OPEN_SEA[0], current_position_lon=OPEN_SEA[1], current_speed=0.0, ship_type="Cargo", ais_status="moored")
     trawler = VesselStub(mmsi="T1", name="F/V TAHITIAN TUNA", current_position_lat=OPEN_SEA[0], current_position_lon=OPEN_SEA[1], current_speed=0.0, ship_type=None)
     assert sts.find_proximity_pairs([yacht_a, yacht_b, moored, trawler], proximity_meters=500) == []
+    # two tankers rafted on a Dutch canal are barge traffic, not a transfer (land mask)
+    canal_a = VesselStub(mmsi="K1", current_position_lat=52.10, current_position_lon=5.10, current_speed=0.0, ship_type="Tanker")
+    canal_b = VesselStub(mmsi="K2", current_position_lat=52.101, current_position_lon=5.10, current_speed=0.0, ship_type="Tanker")
+    assert sts.find_proximity_pairs([canal_a, canal_b], proximity_meters=500) == []
     # a crowded anchorage only yields typed tanker pairings
     crowd = [VesselStub(mmsi=f"C{i}", current_position_lat=OPEN_SEA[0] + 0.004 * i, current_position_lon=OPEN_SEA[1], current_speed=0.0, ship_type="Cargo") for i in range(9)]
     dense_pairs = sts.find_proximity_pairs([a, b, *crowd], proximity_meters=500, cluster_limit=8)
@@ -293,3 +297,13 @@ def test_imo_claims_never_violate_uniqueness(client, maritime_setup):
     assert table["636099003"]["imo"] == "9555555" and table["636099001"]["imo"] is None
     profile = client.get("/api/maritime/vessel/636099003").json()
     assert "HOLDER" in profile["vessel"]["historical_names"]
+
+
+def test_land_mask():
+    from app.analysis import landmask
+
+    assert landmask.is_land(52.1, 5.1) and landmask.is_inland(52.1, 5.1)  # Dutch canal country
+    assert not landmask.is_land(57.0, 19.0) and not landmask.is_inland(57.0, 19.0)  # open Baltic
+    assert not landmask.is_land(42.0, 50.0)  # the Caspian is a hole in the Eurasian polygon
+    assert landmask.is_land(23.0, 10.0) and landmask.coast_distance_km(23.0, 10.0) is None  # deep Sahara
+    assert not landmask.is_inland(-6.07, 106.895)  # Jakarta anchorage: sea within the coastal margin
