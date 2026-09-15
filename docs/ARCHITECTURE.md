@@ -76,3 +76,5 @@ Nginx (static frontend + /api proxy + WebSocket)  <--  Cloudflare Tunnel  <--  a
 | 2.5 | Sanctions bot: OFAC/EU/UN import + diffing, screening index, entity search/check, updates timeline | done |
 | 3 | Maritime bot: AIS ingestion, OFAC/EU/UN screening, evasion/transshipment/ports/zones, map, breach board, audit log UI, WebSocket | done |
 | 4 | Polish: PDF reports, settings editor, dashboard KPIs, linkage explorer, notifications, API token, position-anomaly detection, CI, docs | done (v1.0.0) |
+| 5 (ecosystem tier 1) | Geopolitical event monitor (GDELT + official feeds, classification, cross-domain correlation) | done |
+| 5 (ecosystem tier 1) | Blockchain tracker, corporate intelligence, energy flow monitor, correlation engine | in progress |

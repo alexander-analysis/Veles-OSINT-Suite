@@ -18,6 +18,7 @@ class Vessel(UpdatedTimestampMixin, Base):
     historical_names = Column(JSON)  # previous names (name-spoofing detection)
     historical_flags = Column(JSON)  # previous flag states (re-flagging detection)
     destination = Column(String(100))  # AIS-declared destination
+    draught = Column(Float)  # metres, from static data - laden/ballast inference
     call_sign = Column(String(20), index=True)
     flag_state = Column(String(3), nullable=False, index=True)  # ISO country code
     ship_type = Column(String(100))  # Tanker, Cargo, ...

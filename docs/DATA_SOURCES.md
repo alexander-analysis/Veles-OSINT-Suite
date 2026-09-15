@@ -51,6 +51,19 @@ fewer than half the known listings never delists anything.
 
 Polygons are coarse by design; refine them for your area of interest.
 
+## Geopolitical events
+
+| Source | What VELES reads | Cadence | Credential |
+|--------|------------------|---------|------------|
+| GDELT 2.0 event export (`data.gdeltproject.org/gdeltv2/lastupdate.txt`) | Every 15-minute CAMEO-coded event file; kept: sanctions (163/172), conflict roots 15/18/19/20 and political roots 10-14/16/17 with >= `gdelt_min_mentions` mentions and a geocoded country. Events outside the watchlist countries need twice the mentions. Headlines are reconstructed from the article URL slug and used to corroborate (or demote) GDELT's coding | 15 min | none |
+| GDELT DOC 2.0 API | Topic searches (tanker/vessel seizures, port and strait closures, sanctions, energy infrastructure, trade measures) | 30 min, >= 15 s between calls | none - the API throttles aggressively; rate-limited runs simply stop and retry next time |
+| UK FCDO news (Atom) | Official statements and sanctions announcements | 30 min | none |
+| UN press releases (RSS) | Security Council / General Assembly output | 30 min | none |
+| OFAC recent actions (HTML) | Designation / delisting actions (OFAC no longer publishes RSS) | 30 min | none |
+| RT, TASS, Global Times (RSS) | State-media headlines - stored only when they hit a monitored topic, tagged `state_media`, reliability 0.3-0.35 | 30 min | none |
+
+Feeds are configurable under `geopolitical.official_feeds` / `doc_topics` in `settings.yaml`.
+
 ## Optional context
 
 | Source | Use | Credential |

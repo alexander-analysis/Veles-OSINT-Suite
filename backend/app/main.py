@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app import __version__
-from app.api import admin, health, maritime, market, sanctions, stream
+from app.api import admin, geopolitical, health, maritime, market, sanctions, stream
 from app.auth import APITokenMiddleware
 from app.bots.scheduler import start_scheduler, stop_scheduler
 from app.config import BACKEND_DIR, settings
@@ -37,7 +37,7 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(
     title="VELES",
     version=__version__,
-    description="OSINT intelligence platform: multi-exchange market surveillance and maritime sanctions monitoring.",
+    description="OSINT intelligence platform: market surveillance, sanctions monitoring, maritime tracking and geopolitical event correlation.",
     lifespan=lifespan,
 )
 
@@ -57,6 +57,7 @@ app.include_router(market.router, prefix="/api/market")
 app.include_router(maritime.router, prefix="/api/maritime")
 app.include_router(stream.router, prefix="/api/maritime")
 app.include_router(sanctions.router, prefix="/api/sanctions")
+app.include_router(geopolitical.router, prefix="/api/geopolitical")
 app.include_router(admin.router, prefix="/api/admin")
 
 # ---------------------------------------------------------------------------

@@ -186,6 +186,28 @@ def register_maritime_jobs() -> None:
     scheduler.add_job(_on_loop(maritime_bot.fetch_ais_positions, timeout=120), id="maritime.initial_fetch", replace_existing=True)
 
 
+def register_geopolitical_jobs() -> None:
+    from app.bots.geopolitical import geopolitical_bot
+
+    cfg = config_store.get_config()
+    geo = cfg.get("geopolitical", {})
+    retention = cfg.get("retention", {})
+    if not geo.get("enabled", True):
+        log.info("geopolitical monitor disabled in settings")
+        return
+    boot = datetime.now(timezone.utc)
+    scheduler.add_job(_on_loop(geopolitical_bot.fetch_gdelt_events, timeout=300), "interval", minutes=int(geo.get("gdelt_events_interval_minutes", 15)),
+                      next_run_time=boot + timedelta(seconds=45), id="geopolitical.gdelt_events", replace_existing=True)
+    scheduler.add_job(_on_loop(geopolitical_bot.fetch_topic_articles, timeout=600), "interval", minutes=int(geo.get("doc_interval_minutes", 30)),
+                      next_run_time=boot + timedelta(seconds=150), id="geopolitical.gdelt_doc", replace_existing=True)
+    scheduler.add_job(_on_loop(geopolitical_bot.fetch_official_feeds, timeout=300), "interval", minutes=int(geo.get("official_feeds_interval_minutes", 30)),
+                      next_run_time=boot + timedelta(seconds=90), id="geopolitical.official_feeds", replace_existing=True)
+    scheduler.add_job(_on_loop(geopolitical_bot.correlate, timeout=300), "interval", minutes=int(geo.get("correlation_interval_minutes", 10)),
+                      next_run_time=boot + timedelta(seconds=300), id="geopolitical.correlate", replace_existing=True)
+    scheduler.add_job(_on_loop(geopolitical_bot.cleanup_old_data, timeout=600), "cron", hour=int(retention.get("purge_hour_utc", 2)), minute=45,
+                      id="geopolitical.cleanup_old_data", replace_existing=True)
+
+
 def register_notification_jobs() -> None:
     from app import notifications
 
@@ -202,6 +224,7 @@ def start_scheduler() -> BackgroundScheduler:
     register_market_jobs()
     register_sanctions_jobs()
     register_maritime_jobs()
+    register_geopolitical_jobs()
     register_notification_jobs()
     scheduler.start()
     log.info("started with {} job(s)", len(scheduler.get_jobs()))

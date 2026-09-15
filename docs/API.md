@@ -86,6 +86,21 @@ total notional ($1M/$5M/$20M/$100M), coordination by confidence.
 | `GET /report/{7days|30days|24h}?format=json|pdf` | Activity report (JSON or PDF) |
 | `GET /status` / `POST /refresh?authority=OFAC,EU` | Bot status; trigger a refresh (202) |
 
+## Geopolitical (`/api/geopolitical`)
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /events?hours=&event_type=&country=&min_severity=&source=&correlated=&q=&limit=&offset=` | Events (types: conflict, sanctions, political, trade, port_closure, infrastructure, maritime_incident); `country` matches primary, secondary or affected countries |
+| `GET /events/{id}` | One event with its cross-domain correlations |
+| `POST /events/{id}/verify` `{"status": "confirmed|disputed|unconfirmed", "notes": "...", "analyst": "..."}` | Analyst verification (audited as `event_verification`) |
+| `GET /alerts?hours=&limit=` | High / critical events, correlated ones first |
+| `GET /correlations?hours=&alert_type=&min_score=` | Event <-> market alert / sanctions breach / evasion event / STS / sanctions update links |
+| `GET /timeline/{ISO2}?days=` | Per-country daily buckets + events |
+| `GET /geojson?hours=&min_severity=` | Geolocated events as a FeatureCollection (GDELT action geography) |
+| `GET /summary?hours=` | Counts by type / severity / country for dashboards |
+| `GET /sources` | Feed health (last fetch, status, latency) |
+| `GET /status` / `POST /refresh?job=all|gdelt|doc|feeds|correlate` | Bot status; run a collection job now (202) |
+
 ## Admin (`/api/admin`)
 
 ### `GET /api/admin/config`

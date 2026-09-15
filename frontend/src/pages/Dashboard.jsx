@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { TrendingUp, Ship, Activity, Database, Clock, ShieldAlert, FileDown, AlertTriangle } from 'lucide-react';
+import { TrendingUp, Ship, Activity, Database, Clock, ShieldAlert, FileDown, AlertTriangle, Globe } from 'lucide-react';
 import PageHeader from '../components/common/PageHeader';
 import StatusBadge from '../components/common/StatusBadge';
 import LoadingSpinner from '../components/common/LoadingSpinner';
@@ -45,6 +45,8 @@ export default function Dashboard() {
   const { data: alerts } = useFetch('/api/market/alerts?acknowledged=false&limit=5&severity=high,critical', 30000);
   const { data: breaches } = useFetch('/api/maritime/breaches?limit=5', 30000);
   const { data: events } = useFetch(`/api/maritime/audit-log?action_type=${SIGNIFICANT}&limit=12`, 30000);
+  const { data: geo } = useFetch('/api/geopolitical/summary?hours=24', 60000);
+  const { data: geoAlerts } = useFetch('/api/geopolitical/alerts?hours=48&limit=5', 60000);
   const market = health?.bots?.market;
   const maritime = health?.bots?.maritime;
   const sanctions = health?.bots?.sanctions;
@@ -67,7 +69,8 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4 mb-4">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5 mb-4">
+        <Tile icon={Globe} title="Geopolitical events (24h)" value={geo ? geo.total : '-'} detail={geo ? `${(geo.by_severity?.critical || 0) + (geo.by_severity?.high || 0)} high/critical - ${geo.correlations} cross-domain links` : undefined} tone={geo ? ((geo.by_severity?.critical || 0) ? 'error' : (geo.by_severity?.high || 0) ? 'warn' : 'ok') : undefined} to="/geopolitical" />
         <Tile icon={Ship} title="Vessels tracked" value={maritime ? maritime.vessels_tracked.toLocaleString() : '-'} detail={maritime ? `${maritime.vessels_active_1h} active last hour - ${Object.keys(maritime.sources).join(', ') || 'no sources'}` : undefined} tone={maritime ? (maritime.vessels_active_1h ? 'ok' : 'warn') : undefined} to="/maritime" />
         <Tile icon={ShieldAlert} title="Open sanctions breaches" value={maritime ? maritime.open_breaches : '-'} detail={sanctions ? `${listings.toLocaleString()} active listings indexed` : undefined} tone={maritime ? (maritime.open_breaches ? 'error' : 'ok') : undefined} to="/maritime" />
         <Tile icon={TrendingUp} title="Open market alerts" value={market ? market.open_alerts : '-'} detail={market ? `${market.candles_stored.toLocaleString()} candles - last fetch ${market.last_fetch_at ? new Date(market.last_fetch_at).toLocaleTimeString() : '-'}` : undefined} tone={market ? (market.open_alerts ? 'warn' : 'ok') : undefined} to="/market" />
@@ -87,7 +90,20 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-3">
+      <div className="grid gap-4 xl:grid-cols-4">
+        <div className="card">
+          <div className="card-title mb-2 flex items-center gap-1"><Globe size={12} aria-hidden="true" /> Geopolitical alerts</div>
+          {geoAlerts?.events?.length ? (
+            <ul className="space-y-1 text-sm">
+              {geoAlerts.events.map((e) => (
+                <li key={e.id}>
+                  <Link to="/geopolitical" className="font-medium text-steel-700 hover:underline line-clamp-2">{e.title}</Link>
+                  <span className="text-xs text-gray-500">{e.event_type.replace(/_/g, ' ')} - {e.severity} - {e.country_primary || '-'} - {new Date(e.event_date).toLocaleTimeString()}</span>
+                </li>
+              ))}
+            </ul>
+          ) : <p className="text-sm text-gray-500">No high/critical events in the last 48 h.</p>}
+        </div>
         <div className="card">
           <div className="card-title mb-2 flex items-center gap-1"><ShieldAlert size={12} aria-hidden="true" /> Top sanctions matches</div>
           {breaches?.breaches?.length ? (

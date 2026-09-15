@@ -72,8 +72,33 @@ sanctions:
   # Fuzzy vessel-name similarity floor (0-1)
   fuzzy_min_similarity: 0.9
 
+geopolitical:
+  # Geopolitical event monitor: GDELT 2.0 events (15-min exports), GDELT DOC topic
+  # searches and official feeds (gov.uk FCDO, UN press, OFAC recent actions). All keyless.
+  enabled: true
+  gdelt_events_interval_minutes: 15
+  # Keep GDELT events with at least this many media mentions (noise floor)
+  gdelt_min_mentions: 8
+  # GDELT events outside the watchlist countries need 2x the mentions to be kept and are stepped down one severity
+  # watchlist_countries: [RU, UA, IR, ...]   (default: sanctions / conflict / flag-of-convenience states, see analysis/geopolitical.py)
+  doc_interval_minutes: 30
+  doc_timespan: 2h
+  doc_max_records: 40
+  doc_min_interval_seconds: 15
+  # doc_topics: override the built-in topic queries (list of {query, event_type})
+  official_feeds_interval_minutes: 30
+  # official_feeds: override the built-in feeds (list of {name, url, type, reliability, enabled})
+  correlation_interval_minutes: 10
+  # Signals inside +/- N hours of an event are candidates for correlation
+  correlation_window_hours: 24
+  correlation_min_severity: medium
+  min_correlation_score: 0.55
+  # Instant notification (webhook / e-mail) for new events at or above this severity
+  alert_min_severity: critical
+
 retention:
   market_candles_days: 90
+  geopolitical_events_days: 90
   # Global AIS produces a few million position rows per day before sampling;
   # 30 days + thinning keeps the SQLite file in the low gigabytes on a Pi.
   vessel_positions_days: 30
