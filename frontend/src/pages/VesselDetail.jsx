@@ -31,7 +31,8 @@ function CrossDomain({ dossier }) {
   const dark = dossier.dark_oil_indicators || [];
   const links = dossier.fusion_links || [];
   const listed = dossier.listings_by_imo || [];
-  const empty = psc.length + shipments.length + dark.length + links.length + listed.length === 0;
+  const clusters = dossier.spoofing_clusters || [];
+  const empty = psc.length + shipments.length + dark.length + links.length + listed.length + clusters.length === 0;
   return (
     <div className="card mb-4">
       <div className="card-title mb-2">Cross-domain dossier</div>
@@ -59,6 +60,12 @@ function CrossDomain({ dossier }) {
             <div>
               <div className="text-xs font-semibold text-steel-700 mb-1">Dark-oil indicators ({dark.length})</div>
               <ul className="space-y-1">{dark.slice(0, 10).map((d) => <li key={d.id}><span className="text-xs text-gray-500">{new Date(d.detected_at).toLocaleString()}</span> <span className="font-medium">{(d.pattern || '').replace(/_/g, ' ')}</span> ({d.severity}, {Math.round((d.confidence || 0) * 100)}%) - {d.summary}</li>)}</ul>
+            </div>
+          )}
+          {clusters.length > 0 && (
+            <div>
+              <div className="text-xs font-semibold text-red-700 mb-1">GNSS spoofing clusters ({clusters.length})</div>
+              <ul className="space-y-1">{clusters.map((c) => <li key={c.id}><span className="text-xs text-gray-500">{new Date(c.timestamp).toLocaleString()}</span> <span className="font-medium">{c.vessel_count} hulls</span> ({c.severity}{c.inland ? ', on land' : ''}) - {c.summary}</li>)}</ul>
             </div>
           )}
           {links.length > 0 && (

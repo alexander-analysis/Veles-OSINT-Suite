@@ -113,6 +113,11 @@ def collect_signals(db: Session, since: datetime, limit_per_type: int = 400) -> 
         s.add("vessel", e.mmsi)
         s.add("country", flag_of(e.vessel_id))
         s.add("sector", "shipping")
+        if e.event_type == "spoofing_cluster":
+            members = (e.details or {}).get("vessels") or []
+            s.add("vessel", *[m.get("mmsi") for m in members[:40]])
+            s.add("country", *[m.get("flag") for m in members[:40]])
+            s.add("theme", "gnss_interference")
         signals.append(s)
     for t in db.execute(select(TransshipmentEvent).where(TransshipmentEvent.timestamp >= since).limit(limit_per_type)).scalars():
         s = Signal("transshipment", t.id, t.timestamp, f"STS candidate {t.vessel_a_mmsi} / {t.vessel_b_mmsi} ({(t.confidence_score or 0):.2f})", _sev(t.confidence_score))

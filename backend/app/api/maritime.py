@@ -7,7 +7,7 @@ from datetime import timedelta
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from sqlalchemy import func, or_, select
+from sqlalchemy import String, cast, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.analysis.correlation import correlated_vessels, fleet_groups
@@ -524,6 +524,9 @@ def vessel_dossier(mmsi: str, db: Session = Depends(get_db)) -> dict[str, Any]:
         select(SignalCorrelation).where(or_(SignalCorrelation.signal_a_summary.ilike(needle), SignalCorrelation.signal_b_summary.ilike(needle), SignalCorrelation.signal_a_summary.ilike(f"%{vessel.mmsi}%"), SignalCorrelation.signal_b_summary.ilike(f"%{vessel.mmsi}%")))
         .order_by(SignalCorrelation.confidence.desc()).limit(40)
     ).scalars().all()
+    clusters = db.execute(
+        select(EvasionEvent).where(EvasionEvent.event_type == "spoofing_cluster", cast(EvasionEvent.details, String).contains(f'"mmsi": "{vessel.mmsi}"')).order_by(EvasionEvent.timestamp.desc()).limit(20)
+    ).scalars().all()
     listed: list[dict[str, Any]] = []
     if vessel.imo:
         for entity in db.execute(select(SanctionsEntity).where(SanctionsEntity.imo == vessel.imo, SanctionsEntity.is_active.is_(True))).scalars():
@@ -538,5 +541,6 @@ def vessel_dossier(mmsi: str, db: Session = Depends(get_db)) -> dict[str, Any]:
                            "cargo_type": s.cargo_type, "cargo_volume_barrels": s.cargo_volume_barrels, "laden": s.laden, "sanctioned_route": s.sanctioned_route, "dark_oil_suspect": s.dark_oil_suspect, "status": s.status, "risk_score": s.risk_score} for s in shipments],
             "dark_oil_indicators": [{"id": d.id, "pattern": d.detected_pattern, "severity": d.severity, "confidence": d.confidence_score, "summary": d.summary, "detected_at": d.detected_at, "status": d.investigation_status} for d in dark],
             "fusion_links": [{"id": c.id, "type": c.correlation_type, "confidence": c.confidence, "a": c.signal_a_summary, "b": c.signal_b_summary, "shared_keys": c.shared_keys, "detected_at": c.detected_at} for c in links],
+            "spoofing_clusters": [{"id": e.id, "timestamp": e.timestamp, "severity": e.severity, "summary": e.summary, "vessel_count": (e.details or {}).get("vessel_count"), "inland": (e.details or {}).get("inland"), "zones": (e.details or {}).get("zones")} for e in clusters],
         }
     )

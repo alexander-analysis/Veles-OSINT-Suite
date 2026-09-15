@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { TrendingUp, Ship, Activity, Database, Clock, ShieldAlert, FileDown, AlertTriangle, Globe, Coins, Building2, Fuel, Layers, Eye } from 'lucide-react';
+import { TrendingUp, Ship, Activity, Database, Clock, ShieldAlert, FileDown, AlertTriangle, Globe, Coins, Building2, Fuel, Layers, Eye, Bookmark } from 'lucide-react';
 import PageHeader from '../components/common/PageHeader';
 import StatusBadge from '../components/common/StatusBadge';
 import LoadingSpinner from '../components/common/LoadingSpinner';
@@ -53,6 +53,8 @@ export default function Dashboard() {
   const { data: fusion } = useFetch('/api/fusion/summary?hours=48', 60000);
   const { data: aviationSummary } = useFetch('/api/aviation/summary?days=7', 120000);
   const { data: leaksSummary } = useFetch('/api/leaks/summary?days=7', 120000);
+  const { data: watch } = useFetch('/api/watchlist/summary?days=7', 60000);
+  const { data: spoofing } = useFetch('/api/maritime/evasion-patterns?event_type=spoofing_cluster&hours=48&limit=1', 60000);
   const market = health?.bots?.market;
   const maritime = health?.bots?.maritime;
   const sanctions = health?.bots?.sanctions;
@@ -90,6 +92,7 @@ export default function Dashboard() {
         </div>
       ) : null}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6 mb-4">
+        <Tile icon={Bookmark} title="Watchlist (7d)" value={watch ? watch.hits : '-'} detail={watch ? `${watch.items} watched - ${(watch.by_severity?.high || 0) + (watch.by_severity?.critical || 0)} high/critical hits${spoofing ? ` - ${spoofing.total} GNSS spoofing clusters (48h)` : ''}` : undefined} tone={watch ? ((watch.by_severity?.high || 0) + (watch.by_severity?.critical || 0) ? 'warn' : 'ok') : undefined} to="/watchlist" />
         <Tile icon={Eye} title="Monitors (7d)" value={aviationSummary ? aviationSummary.seen_recently : '-'} detail={aviationSummary && leaksSummary ? `listed aircraft seen - ${leaksSummary.events} relevant breaches, ${leaksSummary.tracked_company_hits} on tracked companies` : undefined} tone={aviationSummary ? (aviationSummary.seen_recently ? 'warn' : 'ok') : undefined} to="/monitors" />
         <Tile icon={Layers} title="Fusion (48h)" value={fusion ? fusion.open_composite_alerts : '-'} detail={fusion ? `${fusion.critical_open} critical composite - ${fusion.correlations} cross-domain links` : undefined} tone={fusion ? (fusion.critical_open ? 'error' : fusion.open_composite_alerts ? 'warn' : 'ok') : undefined} to="/fusion" />
         <Tile icon={Fuel} title="Sanctioned oil shipments (7d)" value={energy ? energy.sanctioned_shipments : '-'} detail={energy ? `${Object.values(energy.dark_oil_indicators || {}).reduce((s, n) => s + n, 0)} dark-oil indicators - ${energy.tankers_at_facilities_now} tankers at watched facilities` : undefined} tone={energy ? (Object.values(energy.dark_oil_indicators || {}).reduce((s, n) => s + n, 0) ? 'warn' : 'ok') : undefined} to="/energy" />

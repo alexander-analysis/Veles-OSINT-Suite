@@ -13,9 +13,10 @@ from app.models.corporate import Company
 from app.models.correlation import CompositeAlert, SignalCorrelation
 from app.models.energy import DarkOilIndicator, OilTankerShipment
 from app.models.geopolitical import GeopoliticalEvent
-from app.models.maritime import SanctionsBreach, Vessel
+from app.models.maritime import EvasionEvent, SanctionsBreach, Vessel
 from app.models.market import MarketAlert
 from app.models.tier2 import Aircraft, BreachEvent, InfraAsset, LegalEvent, Narrative
+from app.models.watchlist import WatchlistHit, WatchlistItem
 from app.reports.pdf import Report, Section
 from app.utils.time import to_iso_z, utcnow
 
@@ -49,6 +50,9 @@ def fusion_brief(db: Session, start: datetime, end: datetime, classification: st
     narratives = db.execute(select(Narrative).where(Narrative.last_seen.between(start, end)).order_by(Narrative.score.desc()).limit(8)).scalars().all()
     legal = db.execute(select(LegalEvent).where(or_(LegalEvent.event_date.between(start, end), LegalEvent.discovered_at.between(start, end))).order_by(LegalEvent.event_date.desc().nulls_last()).limit(12)).scalars().all()
     infra_live = db.execute(select(func.count(InfraAsset.id)).where(InfraAsset.is_live.is_(True))).scalar() or 0
+    spoofing = db.execute(select(EvasionEvent).where(EvasionEvent.event_type == "spoofing_cluster", EvasionEvent.timestamp.between(start, end)).order_by(EvasionEvent.timestamp.desc()).limit(10)).scalars().all()
+    watch_hits = db.execute(select(WatchlistHit, WatchlistItem).join(WatchlistItem, WatchlistItem.id == WatchlistHit.item_id).where(WatchlistHit.created_at.between(start, end), WatchlistHit.severity.in_(["medium", "high", "critical"]))
+                            .order_by(WatchlistHit.timestamp.desc()).limit(20)).all()
     vessels_active = db.execute(select(func.count(Vessel.id)).where(Vessel.last_ais_update >= end - timedelta(hours=24))).scalar() or 0
 
     report = Report(title="VELES Cross-Domain Intelligence Brief", subtitle="Market, sanctions, maritime, geopolitical, blockchain, corporate, energy, aviation, cyber, information and legal signals - fused", classification=classification,
@@ -84,6 +88,10 @@ def fusion_brief(db: Session, start: datetime, end: datetime, classification: st
         report.sections.append(Section("Cyber - relevant breach / ransomware postings", table=[["Discovered", "Victim", "Country", "Actor", "Relevance", "Score"], *[[_fmt(b.discovered_at), b.victim_name[:40], b.country or "-", b.threat_actor or b.source, (b.relevance or "").replace("_", " "), f"{(b.relevance_score or 0):.2f}"] for b in breaches_cyber]]))
     if narratives:
         report.sections.append(Section("Information - state-media narratives", table=[["Last seen", "Divergence", "Topic", "Items / outlets", "Score"], *[[_fmt(n.last_seen), n.divergence, n.topic[:60], f"{n.item_count} / {n.outlet_count}", f"{(n.score or 0):.2f}"] for n in narratives]]))
+    if spoofing:
+        report.sections.append(Section("Maritime - GNSS spoofing / jamming clusters", table=[["When", "Severity", "Hulls", "On land", "Where"], *[[_fmt(e.timestamp), e.severity, (e.details or {}).get("vessel_count", "-"), "yes" if (e.details or {}).get("inland") else "no", (e.summary or "").split(": ", 1)[-1][:95]] for e in spoofing]], column_widths=[18, 16, 12, 14, 116]))
+    if watch_hits:
+        report.sections.append(Section("Watchlist - new hits on watched items", table=[["When", "Watched", "Kind", "Record", "Severity", "Summary"], *[[_fmt(h.timestamp), (i.label or i.key)[:28], i.kind, h.record_type.replace("_", " "), h.severity or "-", (h.summary or "")[:70]] for h, i in watch_hits]], column_widths=[18, 40, 16, 26, 16, 60]))
     if legal:
         report.sections.append(Section("Legal - enforcement, prosecutions, dockets", table=[["Date", "Source", "Type", "Title", "Listed party"], *[[_fmt(e.event_date), e.source, e.event_type or "-", e.title[:70], e.matched_entity_name or "-"] for e in legal]], column_widths=[18, 26, 20, 72, 40]))
     method = (
