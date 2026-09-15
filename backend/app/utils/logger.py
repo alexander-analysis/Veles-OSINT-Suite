@@ -1,7 +1,8 @@
 """Loguru configuration.
 
-Console output goes to stderr (captured by journald on the Pi); files rotate
-under ``backend/logs/``:
+Console output goes to stderr (WARNING and above in production, since the
+Pi's systemd unit appends it to an unrotated file); files rotate under
+``backend/logs/``:
 
 * ``veles.log``  - everything at LOG_LEVEL and above
 * ``errors.log`` - ERROR and above only
@@ -30,7 +31,8 @@ def configure_logging() -> None:
     LOG_DIR.mkdir(exist_ok=True)
     logger.remove()
     logger.configure(extra={"component": "app"})
-    logger.add(sys.stderr, level=settings.LOG_LEVEL, format=_FORMAT)
+    # In production the rotated files carry the full log; the unrotated stderr capture (systemd append) only gets warnings
+    logger.add(sys.stderr, level="WARNING" if settings.ENVIRONMENT == "production" else settings.LOG_LEVEL, format=_FORMAT)
     logger.add(
         LOG_DIR / "veles.log",
         level=settings.LOG_LEVEL,

@@ -16,4 +16,5 @@ if __name__ == "__main__":
         host=settings.API_HOST,
         port=settings.API_PORT,
         log_level=settings.LOG_LEVEL.lower(),
+        access_log=settings.ENVIRONMENT != "production",  # the polling UI would otherwise fill the unrotated stderr capture
     )
