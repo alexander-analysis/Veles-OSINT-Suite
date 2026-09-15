@@ -46,7 +46,7 @@ class GeopoliticalEvent(Base):
         Index("ix_geopolitical_events_type_date", "event_type", "event_date"),
         Index("ix_geopolitical_events_country_date", "country_primary", "event_date"),
         Index("ix_geopolitical_events_severity_date", "severity", "event_date"),
-        Index("ix_geopolitical_events_source_id", "source", "source_id"),
+        Index("ix_geopolitical_events_source_ref", "source", "source_id"),
     )
 
 

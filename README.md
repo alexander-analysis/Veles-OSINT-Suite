@@ -7,7 +7,7 @@ OFAC, EU and UN sanctions lists, with evasion detection and an immutable audit
 trail). Runs 24/7 on a Raspberry Pi 5 and is reachable remotely through a
 Cloudflare Tunnel.
 
-**Status: v1.1 - core platform complete; ecosystem tier 1 complete (geopolitical monitor, blockchain tracker, corporate intelligence, energy flow monitor, fusion engine).**
+**Status: v1.1 - core platform complete; ecosystem tiers 1-3 live: geopolitical, blockchain, corporate, energy, fusion engine, aviation, leaks, narratives, infrastructure and legal monitors.**
 
 | Module | What it does |
 |--------|--------------|
@@ -19,6 +19,7 @@ Cloudflare Tunnel.
 | Corporate intelligence | Every listed company and vessel owner resolved through GLEIF in rotation: LEI records, direct / ultimate parents, subsidiaries; unlisted companies under or above a listed party surface as sanctions exposure; shell and opacity indicators (secrecy jurisdictions, undisclosed parents, lapsed registrations, fresh formations); live LEI search with import-and-walk |
 | Energy flow monitor | ~60 curated terminals, refineries, LNG plants and STS anchorages watched through AIS: tanker calls with draught changes become shipments (origin, destination, estimated barrels), dark-oil indicators (loading at sanctioned facilities, AIS gaps and spoofing after loading, STS transfers, anchorage loitering, identity changes) and daily flow snapshots correlated with Brent / WTI |
 | Intelligence fusion | Every bot output becomes a typed signal (vessels, listed parties, wallets, companies, facilities, countries, assets); cross-domain pairs are scored and clusters spanning three or more domains become composite alerts with a narrative - plus a unified severity-ranked queue and a per-domain timeline |
+| Monitors (tier 2 / 3) | Sanctioned aircraft on ADS-B (adsb.lol / OpenSky), ransomware and breach postings matched to tracked companies and sectors, state-media narrative clustering against official coverage, web infrastructure of listed parties (RDAP, DNS, hosting, certificate transparency), OFAC penalties / DOJ prosecutions / court dockets naming listed parties |
 | Compliance | Append-only audit log (enforced in the ORM and the database), classification markings, PDF/JSON/CSV intelligence reports, optional API token, webhook / e-mail alerts and a daily digest |
 
 Docs: [ARCHITECTURE](docs/ARCHITECTURE.md) - [API](docs/API.md) - [DEPLOYMENT](docs/DEPLOYMENT.md) - [DATA_SOURCES](docs/DATA_SOURCES.md) - [USER_GUIDE](docs/USER_GUIDE.md) - [DEVELOPMENT](docs/DEVELOPMENT.md) - [SECURITY](docs/SECURITY.md) - [LICENSES](docs/LICENSES.md)

@@ -279,6 +279,36 @@ def register_correlation_jobs() -> None:
                       next_run_time=datetime.now(timezone.utc) + timedelta(seconds=420), id="fusion.correlate", replace_existing=True)
 
 
+def register_tier2_jobs() -> None:
+    from app.bots.aviation import aviation_bot
+    from app.bots.infra import infra_bot
+    from app.bots.leaks import leaks_bot
+    from app.bots.legal import legal_bot
+    from app.bots.narratives import narrative_bot
+
+    cfg = config_store.get_config()
+    boot = datetime.now(timezone.utc)
+    aviation = cfg.get("aviation", {})
+    if aviation.get("enabled", True):
+        scheduler.add_job(_on_loop(aviation_bot.sync_aircraft, timeout=300), "interval", hours=12, next_run_time=boot + timedelta(seconds=300), id="aviation.sync", replace_existing=True)
+        scheduler.add_job(_on_loop(aviation_bot.sweep, timeout=900), "interval", minutes=int(aviation.get("sweep_interval_minutes", 15)), next_run_time=boot + timedelta(seconds=360), id="aviation.sweep", replace_existing=True)
+        scheduler.add_job(_on_loop(aviation_bot.poll_hexes, timeout=120), "interval", minutes=int(aviation.get("hex_poll_interval_minutes", 5)), next_run_time=boot + timedelta(seconds=420), id="aviation.poll_hexes", replace_existing=True)
+    leaks = cfg.get("leaks", {})
+    if leaks.get("enabled", True):
+        scheduler.add_job(_on_loop(leaks_bot.fetch, timeout=300), "interval", minutes=int(leaks.get("interval_minutes", 60)), next_run_time=boot + timedelta(seconds=480), id="leaks.fetch", replace_existing=True)
+    narratives = cfg.get("narratives", {})
+    if narratives.get("enabled", True):
+        scheduler.add_job(_on_loop(narrative_bot.run, timeout=300), "interval", minutes=int(narratives.get("interval_minutes", 30)), next_run_time=boot + timedelta(seconds=540), id="narratives.run", replace_existing=True)
+    infra = cfg.get("infra", {})
+    if infra.get("enabled", True):
+        scheduler.add_job(_on_loop(infra_bot.seed, timeout=300), "interval", hours=24, next_run_time=boot + timedelta(seconds=600), id="infra.seed", replace_existing=True)
+        scheduler.add_job(_on_loop(infra_bot.footprint, timeout=900), "interval", minutes=int(infra.get("interval_minutes", 20)), next_run_time=boot + timedelta(seconds=660), id="infra.footprint", replace_existing=True)
+    legal = cfg.get("legal", {})
+    if legal.get("enabled", True):
+        scheduler.add_job(_on_loop(legal_bot.fetch_official, timeout=300), "interval", hours=int(legal.get("official_interval_hours", 6)), next_run_time=boot + timedelta(seconds=720), id="legal.official", replace_existing=True)
+        scheduler.add_job(_on_loop(legal_bot.search_dockets, timeout=600), "interval", minutes=int(legal.get("docket_interval_minutes", 30)), next_run_time=boot + timedelta(seconds=780), id="legal.dockets", replace_existing=True)
+
+
 def register_notification_jobs() -> None:
     from app import notifications
 
@@ -300,6 +330,7 @@ def start_scheduler() -> BackgroundScheduler:
     register_corporate_jobs()
     register_energy_jobs()
     register_correlation_jobs()
+    register_tier2_jobs()
     register_notification_jobs()
     scheduler.start()
     log.info("started with {} job(s)", len(scheduler.get_jobs()))

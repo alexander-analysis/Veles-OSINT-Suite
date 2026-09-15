@@ -14,8 +14,9 @@ from datetime import datetime
 SEVERITY_RANK = {"low": 0, "medium": 1, "high": 2, "critical": 3}
 RANK_SEVERITY = {v: k for k, v in SEVERITY_RANK.items()}
 
+STRONG_KINDS = ("vessel", "entity", "wallet", "company", "facility", "aircraft", "domain")
 # how much a shared key of each kind says about a real link
-KEY_WEIGHTS = {"vessel": 0.9, "entity": 0.8, "wallet": 0.8, "company": 0.75, "facility": 0.6, "country": 0.35, "asset": 0.35, "sector": 0.25, "theme": 0.3}
+KEY_WEIGHTS = {"vessel": 0.9, "entity": 0.8, "wallet": 0.8, "company": 0.75, "aircraft": 0.9, "domain": 0.8, "facility": 0.6, "country": 0.35, "asset": 0.35, "sector": 0.25, "theme": 0.3}
 DOMAIN_OF_TYPE = {
     "market_alert": "market", "coordination_event": "market", "liquidation_cascade": "market",
     "sanctions_breach": "maritime", "evasion_event": "maritime", "transshipment": "maritime", "port_call": "maritime",
@@ -24,6 +25,11 @@ DOMAIN_OF_TYPE = {
     "blockchain_tx": "blockchain",
     "corporate_exposure": "corporate",
     "dark_oil": "energy", "oil_shipment": "energy",
+    "aircraft_sighting": "aviation",
+    "breach": "cyber",
+    "narrative": "information",
+    "legal_event": "legal",
+    "infra_asset": "infrastructure",
 }
 
 
@@ -65,7 +71,7 @@ def shared_keys(a: Signal, b: Signal) -> tuple[float, list[str]]:
     for kind, weight in KEY_WEIGHTS.items():
         common = a.keys.get(kind, set()) & b.keys.get(kind, set())
         if common:
-            score += weight * (1 if kind in ("vessel", "entity", "wallet", "company", "facility") else min(1.0, 0.6 + 0.2 * len(common)))
+            score += weight * (1 if kind in STRONG_KINDS else min(1.0, 0.6 + 0.2 * len(common)))
             shared.extend(f"{kind}:{c}" for c in sorted(common)[:5])
     return min(score, 1.0), shared
 
@@ -77,7 +83,6 @@ def time_factor(a: datetime, b: datetime, window_hours: float) -> float:
     return 1.0 - 0.5 * (delta / window_hours)
 
 
-STRONG_KINDS = ("vessel", "entity", "wallet", "company", "facility")
 WEAK_GROUP_LIMIT = {"country": 40, "asset": 60, "sector": 25, "theme": 25}
 
 
@@ -117,7 +122,7 @@ def correlate(signals: list[Signal], window_hours: float = 48, min_score: float 
                 if score < min_score:
                     continue
                 strongest = shared[0].split(":")[0] if shared else "time"
-                ctype = {"vessel": "entity", "entity": "entity", "wallet": "entity", "company": "entity", "facility": "geographic", "country": "geographic", "asset": "topical", "sector": "topical", "theme": "topical"}.get(strongest, "temporal")
+                ctype = {"vessel": "entity", "entity": "entity", "wallet": "entity", "company": "entity", "aircraft": "entity", "domain": "entity", "facility": "geographic", "country": "geographic", "asset": "topical", "sector": "topical", "theme": "topical"}.get(strongest, "temporal")
                 delta = int((b.time - a.time).total_seconds() // 60)
                 pairs.append(Pair(a, b, score, shared, ctype, delta))
                 if len(pairs) >= max_pairs:
@@ -209,5 +214,5 @@ def narrative(cluster: Cluster) -> str:
 
 def title_for(cluster: Cluster) -> str:
     kind, _, value = cluster.anchor.partition(":")
-    label = {"vessel": "Vessel", "entity": "Listed party", "wallet": "Wallet", "company": "Company", "facility": "Facility", "country": "Country", "asset": "Asset", "sector": "Sector", "theme": "Theme"}.get(kind, kind)
+    label = {"vessel": "Vessel", "entity": "Listed party", "wallet": "Wallet", "company": "Company", "aircraft": "Aircraft", "domain": "Domain", "facility": "Facility", "country": "Country", "asset": "Asset", "sector": "Sector", "theme": "Theme"}.get(kind, kind)
     return f"{label} {value}: {' + '.join(cluster.domains)}"[:300]

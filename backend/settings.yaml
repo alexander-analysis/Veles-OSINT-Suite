@@ -153,6 +153,46 @@ correlation:
   min_pair_score: 0.45
   min_domains: 3
 
+aviation:
+  # Sanctioned airframes (OFAC aircraft listings) swept on adsb.lol by registration; learned Mode S codes
+  # polled in batches (adsb.lol + anonymous OpenSky, ~300 calls/day budget).
+  enabled: true
+  sweep_interval_minutes: 15
+  sweep_batch: 120
+  hex_poll_interval_minutes: 5
+  opensky_daily_budget: 300
+
+leaks:
+  # ransomware.live victim postings + HIBP breach catalogue matched against tracked companies, sectors and keywords
+  enabled: true
+  interval_minutes: 60
+  ransomware_live_enabled: true
+  hibp_enabled: true
+  min_store_score: 0.5
+  watch_keywords: [maritime, shipping, port, tanker, oil, gas, pipeline, bank, crypto, exchange, ministry, defence, defense]
+
+narratives:
+  # State-media headline clustering (RT / TASS / Global Times from the geopolitical feeds)
+  enabled: true
+  interval_minutes: 30
+  window_hours: 36
+  min_items: 3
+
+infra:
+  # Domains from OFAC "Website" remarks: RDAP, DNS, hosting ASN / country, certificate transparency
+  enabled: true
+  interval_minutes: 20
+  batch: 15
+  recheck_days: 14
+
+legal:
+  # OFAC civil penalties, DOJ press releases (sanctions keywords), CourtListener dockets naming listed parties
+  enabled: true
+  official_interval_hours: 6
+  courtlistener_enabled: true
+  docket_interval_minutes: 30
+  courtlistener_batch: 8
+
 retention:
   market_candles_days: 90
   blockchain_transactions_days: 90

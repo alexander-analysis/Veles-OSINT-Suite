@@ -154,6 +154,18 @@ total notional ($1M/$5M/$20M/$100M), coordination by confidence.
 | `GET /summary?hours=` | Open / critical composite alerts, correlation counts by type, top alerts |
 | `GET /status` / `POST /refresh` | Engine status; run a correlation pass now (202) |
 
+## Monitors (tier 2 / 3)
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/aviation/aircraft?seen_days=&operator=&country=&q=` / `GET /api/aviation/aircraft/{id}/sightings` / `GET /api/aviation/sightings` / `GET /api/aviation/geojson` | Listed airframes (OFAC aircraft listings), their ADS-B sightings and last positions |
+| `POST /api/aviation/aircraft` `{"registration": "...", "icao_hex": "...", "operator": "..."}` | Watch an extra airframe (audited) |
+| `GET /api/aviation/summary` / `GET /status` / `POST /refresh?job=all|sync|sweep|hexes` | Status and jobs |
+| `GET /api/leaks/events?days=&relevance=&min_score=&source=&q=` / `GET /summary` / `POST /refresh` | Ransomware victims and breaches matched against tracked companies, listings, sectors, keywords |
+| `GET /api/narratives/?days=&divergence=&min_score=` / `GET /summary` / `POST /refresh` | State-media narrative clusters (state_only / amplified / mirrored) |
+| `GET /api/infra/assets?live=&country=&q=&checked=&min_risk=` / `GET /summary` / `POST /refresh?job=all|seed|footprint` | Domains from OFAC "Website" remarks: registration, resolution, hosting, certificate estate, findings |
+| `GET /api/legal/events?days=&source=&event_type=&matched_only=&q=` / `GET /summary` / `POST /refresh?job=all|official|dockets` | OFAC penalties, DOJ releases, CourtListener dockets naming listed parties |
+
 ## Admin (`/api/admin`)
 
 ### `GET /api/admin/config`

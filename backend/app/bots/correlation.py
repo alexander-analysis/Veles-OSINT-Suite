@@ -29,6 +29,7 @@ from app.models.geopolitical import GeopoliticalEvent
 from app.models.maritime import EvasionEvent, PortCallEvent, SanctionsBreach, TransshipmentEvent, Vessel
 from app.models.market import CoordinationEvent, LiquidationCascade, MarketAlert
 from app.models.sanctions import SanctionsEntity, SanctionsUpdate
+from app.models.tier2 import AircraftSighting, BreachEvent, InfraAsset, LegalEvent, Narrative
 from app.utils import config_store
 from app.utils.logger import logger
 from app.utils.time import utcnow
@@ -188,6 +189,46 @@ def collect_signals(db: Session, since: datetime, limit_per_type: int = 400) -> 
         s.add("country", sh.origin_country, sh.destination_country)
         s.add("facility", facility_key(sh.loading_location), facility_key(sh.discharge_location))
         s.add("sector", "energy", "shipping")
+        signals.append(s)
+
+    # ---- tier 2 / 3
+    seen_flights: set[str] = set()
+    for sighting in db.execute(select(AircraftSighting).where(AircraftSighting.timestamp >= since).order_by(AircraftSighting.timestamp.desc()).limit(limit_per_type * 3)).scalars():
+        if sighting.flight_key in seen_flights:
+            continue  # one signal per flight, not per fix
+        seen_flights.add(sighting.flight_key)
+        aircraft = sighting.aircraft
+        s = Signal("aircraft_sighting", sighting.id, sighting.timestamp, f"{sighting.registration} ({aircraft.operator if aircraft else '?'}) airborne {sighting.nearest_place or ''} as {sighting.callsign or '-'}", "high" if aircraft and aircraft.is_sanctioned else "medium")
+        s.add("aircraft", sighting.registration)
+        s.add("entity", aircraft.operator if aircraft else None)
+        s.add("country", aircraft.country if aircraft else None)
+        s.add("sector", "aviation")
+        signals.append(s)
+    for b in db.execute(select(BreachEvent).where(BreachEvent.discovered_at >= since, BreachEvent.relevance_score >= 0.6).limit(limit_per_type)).scalars():
+        s = Signal("breach", b.id, b.discovered_at, f"{b.victim_name} ({b.country or '?'}) - {(b.relevance or '').replace('_', ' ')} - {b.threat_actor or b.source}", b.severity or "medium")
+        s.add("company", b.victim_name)
+        s.add("entity", b.victim_name)
+        s.add("domain", b.victim_domain)
+        s.add("country", b.country)
+        s.add("sector", (b.sector or "").lower()[:30] or None, "cyber")
+        signals.append(s)
+    for n in db.execute(select(Narrative).where(Narrative.last_seen >= since, Narrative.score >= 0.5).limit(limit_per_type)).scalars():
+        s = Signal("narrative", n.id, n.last_seen, f"State-media narrative ({n.divergence}): {n.topic} - {n.item_count} items / {n.outlet_count} outlets", n.severity or "medium")
+        s.add("country", *(n.countries or []))
+        s.add("theme", "narrative")
+        s.add("sector", *(k for k in (n.keywords or []) if k in ("oil", "gas", "tanker", "sanctions", "pipeline", "port")))
+        signals.append(s)
+    for e in db.execute(select(LegalEvent).where(LegalEvent.discovered_at >= since).limit(limit_per_type)).scalars():
+        s = Signal("legal_event", e.id, e.event_date or e.discovered_at, e.title, "high" if e.matched_entity_id or (e.penalty_usd or 0) >= 1_000_000 else "medium")
+        s.add("entity", e.matched_entity_name, *(e.details or {}).get("parties", [])[:10])
+        s.add("theme", "sanctions" if e.source in ("ofac_enforcement", "courtlistener") else "legal")
+        signals.append(s)
+    for a in db.execute(select(InfraAsset).where(InfraAsset.last_checked >= since, InfraAsset.is_live.is_(True), InfraAsset.risk_score >= 0.6).limit(limit_per_type)).scalars():
+        s = Signal("infra_asset", a.id, a.last_checked, f"{a.value} live for listed party {a.entity_name or '?'} - hosted {a.hosting_country or '?'} ({a.asn_org or '?'})", "medium")
+        s.add("domain", a.value)
+        s.add("entity", a.entity_name)
+        s.add("country", a.hosting_country)
+        s.add("theme", "sanctions")
         signals.append(s)
     return signals
 

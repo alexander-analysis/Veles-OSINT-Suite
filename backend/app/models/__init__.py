@@ -22,6 +22,7 @@ from app.models.maritime import (
 )
 from app.models.market import CoordinationEvent, LiquidationCascade, MarketAlert, MarketCandle
 from app.models.sanctions import SanctionsEntity, SanctionsProgramTracking, SanctionsUpdate
+from app.models.tier2 import Aircraft, AircraftSighting, BreachEvent, InfraAsset, LegalEvent, Narrative
 
 __all__ = [
     "Base",
@@ -46,4 +47,5 @@ __all__ = [
     "CompositeAlert", "SignalCorrelation",
     "DarkOilIndicator", "EnergyFacility", "EnergyFlowSnapshot", "OilTankerShipment",
     "EventCorrelation", "GeopoliticalEvent", "NewsSource",
+    "Aircraft", "AircraftSighting", "BreachEvent", "InfraAsset", "LegalEvent", "Narrative",
 ]

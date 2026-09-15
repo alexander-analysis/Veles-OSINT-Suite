@@ -101,6 +101,20 @@ Name matching strips legal-form tokens (LLC, PAO, GmbH, "Public Joint Stock Comp
 
 Cargo volumes are coarse estimates (size class x 95 % x barrels/tonne, scaled by draught) meant for trend and utilisation, not for cargo accounting.
 
+## Monitors (tier 2 / 3)
+
+| Source | What VELES reads | Cadence | Credential |
+|--------|------------------|---------|------------|
+| OFAC aircraft listings | Registration, model, operator, MSN, Mode S code (when published) for ~340 listed airframes | 12 h | none |
+| adsb.lol (`api.adsb.lol/v2/reg/`, `/v2/hex/`) | Live position by registration (swept in rotation, ~1.6 s apart) and by Mode S batch | 15 min sweep / 5 min hex poll | none |
+| OpenSky Network (anonymous `states/all?icao24=`) | State vectors for learned Mode S codes | 5 min, 300 calls/day budget | none |
+| ransomware.live (`/v2/recentvictims`) | Latest ransomware victim postings (name, country, sector, group, claim URL) | 60 min | none |
+| Have I Been Pwned (`/api/v3/breaches`) | Breach catalogue (domain, date, record count, data classes) | 60 min | none |
+| Own geopolitical feed (RT, TASS, Global Times items) | Headline clustering into narratives, compared with official / non-state coverage | 30 min | none |
+| rdap.org, crt.sh, system DNS | Registration data, hosting ASN / country, certificate-transparency subdomains for domains named in OFAC listings | 15 domains per 20 min, re-checked every 14 days | none |
+| OFAC civil penalties page, DOJ news RSS (`justice.gov/news/rss`), CourtListener v4 search | Enforcement actions, sanctions-related prosecutions, dockets naming listed parties | 6 h / 30 min | none (CourtListener anonymous tier, 2 s pacing) |
+| NASA GIBS / FIRMS, Companies House, OpenCorporates, EIA, Etherscan | Reserved for keyed or imagery sources - see `.env.example` | - | key |
+
 ## Optional context
 
 | Source | Use | Credential |

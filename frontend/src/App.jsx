@@ -18,6 +18,7 @@ const Blockchain = lazy(() => import('./pages/Blockchain'));
 const Corporate = lazy(() => import('./pages/Corporate'));
 const Energy = lazy(() => import('./pages/Energy'));
 const Fusion = lazy(() => import('./pages/Fusion'));
+const Monitors = lazy(() => import('./pages/Monitors'));
 const AuditLogPage = lazy(() => import('./pages/AuditLogPage'));
 const Settings = lazy(() => import('./pages/Settings'));
 
@@ -44,6 +45,7 @@ function App() {
                 <Route path="/corporate" element={<Corporate />} />
                 <Route path="/energy" element={<Energy />} />
                 <Route path="/fusion" element={<Fusion />} />
+                <Route path="/monitors" element={<Monitors />} />
                 <Route path="/correlation" element={<Correlation />} />
                 <Route path="/audit" element={<AuditLogPage />} />
                 <Route path="/settings" element={<Settings />} />
@@ -56,7 +58,7 @@ function App() {
             <span>VELES OSINT Intelligence Platform</span>
             <span>
               Data: Binance, Kraken, Coinbase, Yahoo Finance; AIS: Fintraffic Digitraffic (CC BY 4.0) and configured providers; OFAC SDN, EU consolidated list,
-              UN Security Council list; GDELT Project, UK FCDO, UN press, OFAC; Blockstream, PublicNode, Tronscan, blockchain.com; GLEIF, SEC EDGAR; &copy; OpenStreetMap contributors
+              UN Security Council list; GDELT Project, UK FCDO, UN press, OFAC; Blockstream, PublicNode, Tronscan, blockchain.com; GLEIF, SEC EDGAR; adsb.lol, OpenSky Network, ransomware.live, Have I Been Pwned, RDAP, crt.sh, CourtListener, DOJ; &copy; OpenStreetMap contributors
             </span>
           </div>
         </footer>
