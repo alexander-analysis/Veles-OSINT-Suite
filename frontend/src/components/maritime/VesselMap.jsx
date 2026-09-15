@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { MapContainer, TileLayer, CircleMarker, Polygon, Popup, Tooltip, useMap, useMapEvents, LayersControl, LayerGroup, Polyline, Marker } from 'react-leaflet';
+import { MapContainer, TileLayer, CircleMarker, Circle, Polygon, Popup, Tooltip, useMap, useMapEvents, LayersControl, LayerGroup, Polyline, Marker } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Link } from 'react-router-dom';
@@ -98,7 +98,8 @@ const breachIcon = (severity) =>
  * Interactive vessel map: OSM tiles, colour-coded vessel markers, breach markers,
  * sanctions/monitoring zones by authority, lanes/chokepoints, ports and an optional track.
  */
-export default function VesselMap({ vessels, breaches, selectedTrack, height = '600px', center = [60, 24], zoom = 6, onViewChange, fitToData = true }) {
+export default function VesselMap({ vessels, breaches, selectedTrack, height = '600px', center = [60, 24], zoom = 6, onViewChange, fitToData = true, showInterference = true }) {
+  const { data: interference } = useFetch(showInterference ? '/api/maritime/evasion-patterns?event_type=spoofing_cluster&hours=48&limit=100' : null, 120000);
   const { data: zones } = useFetch('/api/maritime/sanctions-zones', 0);
   const { data: lanes } = useFetch('/api/maritime/shipping-lanes', 0);
   const { data: ports } = useFetch('/api/maritime/ports', 0);
@@ -210,6 +211,25 @@ export default function VesselMap({ vessels, breaches, selectedTrack, height = '
               ))}
             </LayerGroup>
           </LayersControl.Overlay>
+          {showInterference && (
+            <LayersControl.Overlay checked name="GNSS interference (48h)">
+              <LayerGroup>
+                {(interference?.events || []).filter((e) => e.location_lat != null).map((e) => (
+                  <Circle key={`spoof-${e.id}`} center={[e.location_lat, e.location_lon]} radius={Math.min(60000, 12000 + 3000 * (e.details?.vessel_count || 1))} pathOptions={{ color: e.severity === 'critical' ? '#7f1d1d' : '#c0392b', weight: 1.5, dashArray: '6 4', fillColor: '#e74c3c', fillOpacity: 0.12 }}>
+                    <Popup>
+                      <div className="text-xs leading-5">
+                        <b>GNSS SPOOFING / JAMMING - {e.severity}</b>
+                        <br />{e.details?.vessel_count} hulls with implausible positions{e.details?.inland ? ' (on land)' : ''}
+                        <br />{new Date(e.timestamp).toLocaleString()}
+                        {e.details?.zones?.length ? <><br />{e.details.zones.join(', ')}</> : null}
+                        <br />{(e.details?.vessels || []).slice(0, 6).map((v) => v.name || v.mmsi).join(', ')}{(e.details?.vessels || []).length > 6 ? ', ...' : ''}
+                      </div>
+                    </Popup>
+                  </Circle>
+                ))}
+              </LayerGroup>
+            </LayersControl.Overlay>
+          )}
         </LayersControl>
         {selectedTrack?.length > 1 && <Polyline positions={selectedTrack.map((p) => [p.lat, p.lon])} pathOptions={{ color: '#2f4a6b', weight: 2 }} />}
       </MapContainer>
