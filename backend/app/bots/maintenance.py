@@ -6,7 +6,7 @@ from typing import Any
 
 from sqlalchemy import delete
 
-from app.database import SessionLocal
+from app.database import SessionLocal, checkpoint_wal
 from app.models.correlation import CompositeAlert, SignalCorrelation
 from app.models.energy import DarkOilIndicator, EnergyFlowSnapshot, OilTankerShipment
 from app.models.geopolitical import EventCorrelation
@@ -56,5 +56,16 @@ async def purge_ecosystem_tables() -> dict[str, int]:
     return result
 
 
+async def checkpoint() -> dict[str, int] | None:
+    """PASSIVE first (never blocks), then TRUNCATE when the WAL is large - readers are short-lived, so it usually completes."""
+    result = await asyncio.to_thread(checkpoint_wal, "PASSIVE")
+    if result and result["wal_pages"] > 20_000:
+        result = await asyncio.to_thread(checkpoint_wal, "TRUNCATE")
+    if result and result["wal_pages"] > 20_000:
+        log.info("wal checkpoint: {}", result)
+    return result
+
+
 def register(scheduler, on_loop, purge_hour: int) -> Any:
+    scheduler.add_job(on_loop(checkpoint, timeout=600), "interval", minutes=30, id="maintenance.checkpoint", replace_existing=True)
     return scheduler.add_job(on_loop(purge_ecosystem_tables, timeout=900), "cron", hour=purge_hour, minute=55, id="maintenance.purge", replace_existing=True)

@@ -123,3 +123,6 @@ def test_engine_persists_alerts_and_api(client):
 
     purged = asyncio.run(purge_ecosystem_tables())
     assert purged["signal_correlations"] == 0 and "composite_alerts" in purged  # nothing old enough yet
+    from app.bots.maintenance import checkpoint
+
+    assert asyncio.run(checkpoint())["busy"] == 0

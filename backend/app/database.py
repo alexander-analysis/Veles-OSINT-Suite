@@ -51,7 +51,18 @@ if IS_SQLITE:
         cursor.execute("PRAGMA journal_mode=WAL")
         cursor.execute("PRAGMA synchronous=NORMAL")
         cursor.execute("PRAGMA foreign_keys=ON")
+        # Continuous readers keep the WAL from resetting; cap the file so a completed checkpoint truncates it
+        cursor.execute("PRAGMA journal_size_limit=268435456")
         cursor.close()
+
+
+def checkpoint_wal(mode: str = "TRUNCATE") -> dict[str, int] | None:
+    """Force a WAL checkpoint (hourly maintenance on the Pi, where the WAL otherwise grows past 1 GB)."""
+    if not IS_SQLITE:
+        return None
+    with engine.connect() as connection:
+        busy, log_pages, checkpointed = connection.exec_driver_sql(f"PRAGMA wal_checkpoint({mode})").one()
+    return {"busy": int(busy), "wal_pages": int(log_pages), "checkpointed": int(checkpointed)}
 
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine, class_=Session)
