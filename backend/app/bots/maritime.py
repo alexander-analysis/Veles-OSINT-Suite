@@ -61,6 +61,7 @@ class MaritimeBot:
         self.last_sanctions_check_at: datetime | None = None
         self.last_index_seen: datetime | None = None
         self.touched: set[int] = set()  # vessel ids changed since the last risk-score pass
+        self._ingest_lock = asyncio.Lock()
         self._last_history: dict[str, datetime] = {}  # mmsi -> timestamp of the last stored history fix
 
     # ------------------------------------------------------------------ config
@@ -124,6 +125,15 @@ class MaritimeBot:
 
     # -------------------------------------------------------------- ingestion
     async def fetch_ais_positions(self) -> dict[str, int]:
+        if self._ingest_lock.locked():
+            # the previous poll is still writing (a global batch can take a couple of minutes on a Pi);
+            # overlapping ingests would race on vessel creation and fight for the SQLite lock
+            log.warning("AIS poll skipped - previous ingest still running")
+            return dict(self.last_fetch_counts or {})
+        async with self._ingest_lock:
+            return await self._fetch_ais_positions()
+
+    async def _fetch_ais_positions(self) -> dict[str, int]:
         await self.ensure_sources()
         cfg = self.config()
         max_age = int(cfg.get("max_position_age_minutes", 30))

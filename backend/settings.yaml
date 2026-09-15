@@ -32,6 +32,8 @@ market:
 
 maritime:
   ais_poll_interval_seconds: 30
+  # a global batch can take a couple of minutes to write on a Pi; polls are skipped while one is running
+  ais_ingest_timeout_seconds: 300
   sanctions_check_interval_minutes: 15
   sanctions_refresh_hour_utc: 3
   port_data_refresh_hours: 6

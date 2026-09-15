@@ -39,7 +39,13 @@ class BotLoop:
         """Run ``coro`` on the bot loop from any thread and wait for the result."""
         self.start()
         future = asyncio.run_coroutine_threadsafe(coro, self._loop)
-        return future.result(timeout=timeout)
+        try:
+            return future.result(timeout=timeout)
+        except TimeoutError:
+            # APScheduler moves on after a timeout - cancel the coroutine so it cannot keep running
+            # alongside the next scheduled run (two AIS ingests racing was a real bug on the Pi)
+            future.cancel()
+            raise
 
     def submit(self, coro: Coroutine[Any, Any, Any]) -> "asyncio.Future":
         """Fire-and-forget (e.g. a long-lived stream consumer)."""

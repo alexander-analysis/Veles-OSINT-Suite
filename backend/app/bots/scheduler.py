@@ -168,7 +168,7 @@ def register_maritime_jobs() -> None:
     maritime = cfg.get("maritime", {})
     sanctions = cfg.get("sanctions", {})
     retention = cfg.get("retention", {})
-    scheduler.add_job(_on_loop(maritime_bot.fetch_ais_positions, timeout=120), "interval", seconds=int(maritime.get("ais_poll_interval_seconds", 30)), id="maritime.fetch_ais", replace_existing=True)
+    scheduler.add_job(_on_loop(maritime_bot.fetch_ais_positions, timeout=int(maritime.get("ais_ingest_timeout_seconds", 300))), "interval", seconds=int(maritime.get("ais_poll_interval_seconds", 30)), id="maritime.fetch_ais", replace_existing=True)
     # First screening pass ~2 minutes after boot (the list import/index build takes ~20 s), then every N minutes
     scheduler.add_job(
         _on_loop(maritime_bot.check_sanctions, timeout=600),
@@ -183,7 +183,7 @@ def register_maritime_jobs() -> None:
     scheduler.add_job(_on_loop(maritime_bot.detect_dark_vessels, timeout=300), "interval", minutes=15, id="maritime.detect_dark_vessels", replace_existing=True)
     scheduler.add_job(_on_loop(maritime_bot.update_risk_scores, timeout=600), "interval", minutes=int(sanctions.get("check_maritime_interval_minutes", 30)), id="maritime.update_risk_scores", replace_existing=True)
     scheduler.add_job(_on_loop(maritime_bot.cleanup_old_data, timeout=1800), "cron", hour=int(retention.get("purge_hour_utc", 2)), minute=30, id="maritime.cleanup_old_data", replace_existing=True)
-    scheduler.add_job(_on_loop(maritime_bot.fetch_ais_positions, timeout=120), id="maritime.initial_fetch", replace_existing=True)
+    scheduler.add_job(_on_loop(maritime_bot.fetch_ais_positions, timeout=int(maritime.get("ais_ingest_timeout_seconds", 300))), id="maritime.initial_fetch", replace_existing=True)
 
 
 def register_geopolitical_jobs() -> None:

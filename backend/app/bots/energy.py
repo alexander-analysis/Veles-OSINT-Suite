@@ -127,7 +127,9 @@ class EnergyBot:
                     call.flags_raised = sorted(set(call.flags_raised or []) | {"lost_contact"})
                     open_calls.pop(call.vessel_id, None)
                     closed += 1
-            recent = db.execute(select(Vessel).where(Vessel.last_ais_update >= now - timedelta(hours=3), Vessel.current_position_lat.is_not(None))).scalars().all()
+            # only tanker-like hulls, filtered in SQL - the global feed has tens of thousands of recent vessels
+            type_filter = or_(*(Vessel.ship_type.ilike(f"%{t}%") for t in ("tanker", "crude", "oil", "chemical", "lng", "lpg", "gas", "product")))
+            recent = db.execute(select(Vessel).where(Vessel.last_ais_update >= now - timedelta(hours=3), Vessel.current_position_lat.is_not(None), type_filter)).scalars().all()
             tankers = [v for v in recent if is_tanker(v.ship_type)]
             facility_call_names = {c.port_name for c in open_calls.values()}
             for vessel in tankers:
