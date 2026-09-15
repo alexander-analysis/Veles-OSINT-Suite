@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import String, cast, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
@@ -69,6 +69,9 @@ def _vessel_hits(db: Session, mmsi: str, since: datetime) -> list[Hit]:
     hits: list[Hit] = []
     for e in db.execute(select(EvasionEvent).where(EvasionEvent.vessel_id == vessel.id, EvasionEvent.created_at >= since)).scalars():
         hits.append(Hit("evasion_event", e.id, e.timestamp, e.summary or e.event_type, e.severity, href))
+    for e in db.execute(select(EvasionEvent).where(EvasionEvent.event_type == "spoofing_cluster", EvasionEvent.vessel_id != vessel.id, EvasionEvent.timestamp >= since,
+                                                   cast(EvasionEvent.details, String).contains(f'"mmsi": "{vessel.mmsi}"')).limit(20)).scalars():
+        hits.append(Hit("evasion_event", e.id, e.timestamp, f"caught in a GNSS spoofing cluster: {e.summary}", e.severity, href))
     for b in db.execute(select(SanctionsBreach).where(SanctionsBreach.vessel_id == vessel.id, SanctionsBreach.first_detected_at >= since)).scalars():
         hits.append(Hit("sanctions_breach", b.id, b.timestamp, f"{b.sanctioning_authority} {b.breach_type.replace('_', ' ')}: {b.sanctioned_entity_name} ({round((b.match_confidence or 0) * 100)}%)", b.severity, href))
     for p in db.execute(select(PortCallEvent).where(PortCallEvent.vessel_id == vessel.id, PortCallEvent.arrival_time >= since)).scalars():
