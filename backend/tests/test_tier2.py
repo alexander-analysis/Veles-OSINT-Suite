@@ -259,6 +259,8 @@ def test_psc_monitor(client, monkeypatch):
     assert dossier["vessel"]["imo"] == "9700001" and dossier["port_state_control"][0]["port"] == "Rijeka" and dossier["port_state_control"][0]["event_type"] == "detention"
     assert isinstance(dossier["shipments"], list) and isinstance(dossier["fusion_links"], list) and dossier["listings_by_imo"] == []
     assert client.get("/api/maritime/vessel/000000000/dossier").status_code == 404
+    pdf = client.get("/api/maritime/vessel/273777001/dossier?format=pdf&classification=CONFIDENTIAL")
+    assert pdf.status_code == 200 and pdf.headers["content-type"] == "application/pdf" and pdf.content[:4] == b"%PDF" and len(pdf.content) > 2000
     with SessionLocal() as db:
         db.query(PscEvent).delete()
         vessel = db.query(Vessel).filter_by(imo="9700001").first()
@@ -291,6 +293,8 @@ def test_entity_dossier(client):
         assert d["legal_events"][0]["event_type"] == "indictment" and d["domains"][0]["value"] == "dossier-test.example" and d["aircraft"][0]["registration"] == "T7-DOS"
         assert d["vessels"] == [] and d["ownership_chains"] == []
         assert client.get("/api/sanctions/entities/999999999/dossier").status_code == 404
+        pdf = client.get(f"/api/sanctions/entities/{entity_id}/dossier?format=pdf")
+        assert pdf.status_code == 200 and pdf.content[:4] == b"%PDF" and "VELES_Entity_" in pdf.headers["content-disposition"]
     finally:
         with SessionLocal() as db:
             db.query(BlockchainTransaction).filter_by(tx_hash="dossier-tx-1").delete()

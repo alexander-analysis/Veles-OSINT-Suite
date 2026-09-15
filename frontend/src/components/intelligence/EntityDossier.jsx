@@ -1,9 +1,10 @@
 import { Link } from 'react-router-dom';
-import { X } from 'lucide-react';
+import { X, FileDown } from 'lucide-react';
 import StatusBadge from '../common/StatusBadge';
 import LoadingSpinner from '../common/LoadingSpinner';
 import WatchButton from '../common/WatchButton';
 import { useFetch } from '../../hooks/useFetch';
+import { downloadFile } from '../../services/api';
 
 const AUTHORITY_TONE = { OFAC: 'error', EU: 'warn', UN: 'neutral' };
 const fmtDate = (d) => (d ? new Date(d).toLocaleDateString() : '-');
@@ -41,6 +42,7 @@ export default function EntityDossier({ entityId, onClose }) {
         </div>
         <span className="flex items-center gap-2">
           {e && <WatchButton kind="entity" itemKey={String(e.id)} label={`${e.name} (${e.designating_authorities?.[0] || ''})`} />}
+          {e && <button type="button" onClick={() => downloadFile(`/api/sanctions/entities/${e.id}/dossier?format=pdf`, `VELES_Entity_${e.id}.pdf`).catch((err) => alert(err.message))} className="inline-flex items-center gap-1 px-2 py-1 rounded border border-gray-300 bg-white text-xs hover:bg-gray-100"><FileDown size={12} aria-hidden="true" /> PDF</button>}
           {onClose && <button type="button" onClick={onClose} className="text-gray-500 hover:text-gray-800" aria-label="close dossier"><X size={14} /></button>}
         </span>
       </div>

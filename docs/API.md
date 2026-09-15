@@ -56,7 +56,7 @@ total notional ($1M/$5M/$20M/$100M), coordination by confidence.
 | `GET /vessels?bbox=-180,-90,180,90&risk_filter=all|flagged|breach&max_age_hours=24` | GeoJSON FeatureCollection of current positions (`marker_color`: clear `#2ecc71`, flagged `#f39c12`, breach `#e74c3c`) |
 | `GET /vessels/table?q=&flag=&status=&min_risk=&sort=risk|recent|name&limit=&offset=` | Searchable vessel grid |
 | `GET /vessel/{mmsi}` | Full profile: identity + history, sanctions matches, port history, evasion events, transshipments, zone events, position timeline, correlated vessels, audit history, risk factors |
-| `GET /vessel/{mmsi}/dossier` | Cross-domain dossier for one hull: listings sharing its IMO, port state control events, oil shipments, dark-oil indicators, fusion links naming the vessel |
+| `GET /vessel/{mmsi}/dossier?format=json|pdf&classification=` | Cross-domain dossier for one hull: listings sharing its IMO, port state control events, oil shipments, dark-oil indicators, GNSS spoofing clusters, fusion links naming the vessel (PDF export is audited) |
 | `GET /vessel-correlation/{mmsi}?days=30` | Linked vessels (shared owner/operator/beneficial owner, shared designated entity, STS partners, shared high-risk ports) with link strength |
 | `GET /fleets?min_size=2` | Vessel groups sharing a declared owner/operator |
 | `GET /breaches?authority=&severity=&status=&breach_type=&min_confidence=` | Sanctions matches; `status` defaults to open (`flagged,investigating,escalated`), use `review` for the low-confidence queue or `all` |
@@ -86,7 +86,7 @@ total notional ($1M/$5M/$20M/$100M), coordination by confidence.
 |----------|---------|
 | `GET /entities?query=&type=&authority=&program=&active=&limit=&offset=` | Search listings by name / alias / IMO / MMSI with cross-authority `designating_authorities` |
 | `GET /entities/{id}` | One listing |
-| `GET /entities/{id}/dossier` | Everything held on one listed party: other authorities' listings of the same name, matched vessels, companies + ownership chains, wallets (+ balance, recent transfers), domains, legal events, aircraft |
+| `GET /entities/{id}/dossier?format=json|pdf&classification=` | Everything held on one listed party: other authorities' listings of the same name, matched vessels, companies + ownership chains, wallets (+ balance, recent transfers), domains, legal events, aircraft |
 | `POST /check-entity` `{"entity_name": "...", "entity_type": "company", "min_similarity": 0.85}` | Screen a name (audited as `sanctions_check`) |
 | `GET /vessel/{mmsi}` | Recorded breaches + live screen + recommendation |
 | `GET /updates?timeframe=7&authority=&type=` | Change log since the last refreshes with per-authority summary |

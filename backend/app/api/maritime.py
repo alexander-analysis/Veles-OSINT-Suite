@@ -507,8 +507,8 @@ def get_status() -> dict[str, Any]:
 
 
 @router.get("/vessel/{mmsi}/dossier")
-def vessel_dossier(mmsi: str, db: Session = Depends(get_db)) -> dict[str, Any]:
-    """Cross-domain context for one hull: port state control, energy shipments, dark-oil indicators, fusion links, listed owner."""
+def vessel_dossier(mmsi: str, format: str = Query("json", pattern="^(json|pdf)$"), classification: str = Query("UNCLASSIFIED", max_length=50), db: Session = Depends(get_db)):
+    """Cross-domain context for one hull: port state control, energy shipments, dark-oil indicators, fusion links, listed owner (JSON or PDF)."""
     from app.models.correlation import SignalCorrelation
     from app.models.energy import DarkOilIndicator, OilTankerShipment
     from app.models.sanctions import SanctionsEntity
@@ -531,7 +531,7 @@ def vessel_dossier(mmsi: str, db: Session = Depends(get_db)) -> dict[str, Any]:
     if vessel.imo:
         for entity in db.execute(select(SanctionsEntity).where(SanctionsEntity.imo == vessel.imo, SanctionsEntity.is_active.is_(True))).scalars():
             listed.append({"id": entity.id, "authority": entity.designating_authority, "name": entity.name, "programs": entity.programs, "designation_date": entity.designation_date, "vessel_owner": entity.vessel_owner, "vessel_flag": entity.vessel_flag})
-    return jsonable(
+    payload = jsonable(
         {
             "vessel": {"id": vessel.id, "mmsi": vessel.mmsi, "imo": vessel.imo, "name": vessel.name, "flag": vessel.flag_state, "ship_type": vessel.ship_type, "length_m": vessel.length_m, "draught": vessel.draught},
             "listings_by_imo": listed,
@@ -544,3 +544,11 @@ def vessel_dossier(mmsi: str, db: Session = Depends(get_db)) -> dict[str, Any]:
             "spoofing_clusters": [{"id": e.id, "timestamp": e.timestamp, "severity": e.severity, "summary": e.summary, "vessel_count": (e.details or {}).get("vessel_count"), "inland": (e.details or {}).get("inland"), "zones": (e.details or {}).get("zones")} for e in clusters],
         }
     )
+    if format == "pdf":
+        from app.reports.dossier import vessel_dossier_report
+        from app.reports.pdf import build_pdf
+
+        db.add(AuditLog(action_type="export", user_id="analyst", vessel_id=vessel.id, rationale=f"vessel dossier PDF for {vessel.name} ({vessel.mmsi})", source_systems=["api.maritime"], created_by="analyst"))
+        db.commit()
+        return Response(build_pdf(vessel_dossier_report(payload, classification)), media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=VELES_Vessel_{vessel.mmsi}_{utcnow():%Y-%m-%d}.pdf"})
+    return payload

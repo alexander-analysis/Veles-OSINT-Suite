@@ -288,7 +288,7 @@ def trigger_refresh(authority: str | None = Query(None, description="Comma-separ
 
 
 @router.get("/entities/{entity_id}/dossier")
-def entity_dossier(entity_id: int, db: Session = Depends(get_db)) -> dict[str, Any]:
+def entity_dossier(entity_id: int, format: str = Query("json", pattern="^(json|pdf)$"), classification: str = Query("UNCLASSIFIED", max_length=50), db: Session = Depends(get_db)):
     """Everything VELES holds on one listing: vessels matched to it, companies and ownership, wallets, domains, legal events, aircraft."""
     from app.models.blockchain import BlockchainTransaction, BlockchainWallet
     from app.models.corporate import Company, OwnershipChain
@@ -307,7 +307,7 @@ def entity_dossier(entity_id: int, db: Session = Depends(get_db)) -> dict[str, A
     legal = db.execute(select(LegalEvent).where(LegalEvent.matched_entity_id == entity.id).order_by(LegalEvent.event_date.desc().nulls_last()).limit(30)).scalars().all()
     aircraft = db.execute(select(Aircraft).where(Aircraft.sanctioned_entity_id == entity.id)).scalars().all()
     same_name = db.execute(select(SanctionsEntity).where(SanctionsEntity.name_normalized == entity.name_normalized, SanctionsEntity.id != entity.id, SanctionsEntity.is_active.is_(True))).scalars().all()
-    return jsonable(
+    payload = jsonable(
         {
             "entity": SanctionsEntityOut.model_validate(entity).model_dump(),
             "other_listings": [{"id": e.id, "authority": e.designating_authority, "programs": e.programs, "designation_date": e.designation_date} for e in same_name],
@@ -322,3 +322,10 @@ def entity_dossier(entity_id: int, db: Session = Depends(get_db)) -> dict[str, A
             "aircraft": [{"id": a.id, "registration": a.registration, "model": a.model, "operator": a.operator, "last_seen": a.last_seen, "sightings_count": a.sightings_count} for a in aircraft],
         }
     )
+    if format == "pdf":
+        from app.reports.dossier import entity_dossier_report
+
+        db.add(AuditLog(action_type="export", user_id="analyst", rationale=f"entity dossier PDF for {entity.name} ({entity.designating_authority})", supporting_data={"entity_id": entity.id}, source_systems=["api.sanctions"], created_by="analyst"))
+        db.commit()
+        return Response(build_pdf(entity_dossier_report(payload, classification)), media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=VELES_Entity_{entity.id}_{utcnow():%Y-%m-%d}.pdf"})
+    return payload

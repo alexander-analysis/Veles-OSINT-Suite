@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import clsx from 'clsx';
-import { ArrowLeft, Play, Pause } from 'lucide-react';
+import { ArrowLeft, Play, Pause, FileDown } from 'lucide-react';
 import PageHeader from '../components/common/PageHeader';
 import StatusBadge from '../components/common/StatusBadge';
 import LoadingSpinner from '../components/common/LoadingSpinner';
@@ -10,6 +10,7 @@ import AuditLog from '../components/intelligence/AuditLog';
 import WatchButton from '../components/common/WatchButton';
 import { statusTone } from '../components/maritime/VesselTable';
 import { useFetch } from '../hooks/useFetch';
+import { downloadFile } from '../services/api';
 
 const AUTHORITY_TONE = { OFAC: 'error', EU: 'warn', UN: 'neutral' };
 
@@ -124,6 +125,7 @@ export default function VesselDetail() {
         <StatusBadge tone={statusTone(v.sanctioned_status)}>{v.sanctioned_status || 'clear'}</StatusBadge>
         <StatusBadge tone={(v.risk_score || 0) >= 0.6 ? 'error' : (v.risk_score || 0) >= 0.3 ? 'warn' : 'ok'}>risk {Math.round((v.risk_score || 0) * 100)}%</StatusBadge>
         <WatchButton kind="vessel" itemKey={v.mmsi} label={`${v.name} (${v.flag_state})`} />
+        <button type="button" onClick={() => downloadFile(`/api/maritime/vessel/${v.mmsi}/dossier?format=pdf`, `VELES_Vessel_${v.mmsi}.pdf`).catch((err) => alert(err.message))} className="inline-flex items-center gap-1 px-2 py-1 rounded border border-gray-300 bg-white text-xs hover:bg-gray-100"><FileDown size={12} aria-hidden="true" /> dossier PDF</button>
         <Link to="/maritime" className="text-xs text-steel-600 flex items-center gap-1"><ArrowLeft size={12} aria-hidden="true" /> back to map</Link>
       </PageHeader>
 
