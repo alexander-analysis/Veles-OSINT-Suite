@@ -62,7 +62,7 @@ total notional ($1M/$5M/$20M/$100M), coordination by confidence.
 | `GET /breaches?authority=&severity=&status=&breach_type=&min_confidence=` | Sanctions matches; `status` defaults to open (`flagged,investigating,escalated`), use `review` for the low-confidence queue or `all` |
 | `GET /breaches/{authority}` | All matches for OFAC / EU / UN |
 | `PATCH /breach/{id}` `{"investigation_status": "investigating|cleared|escalated", "analyst_notes": "..."}` | Audited status change; clearing recomputes the vessel status and risk |
-| `GET /evasion-patterns?event_type=&severity=&hours=` / `PATCH /evasion-patterns/{id}` | AIS gaps, renames, re-flagging, IMO conflicts, dark vessels, `position_anomaly` (impossible speed/jump - spoofing) |
+| `GET /evasion-patterns?event_type=&severity=&hours=` / `PATCH /evasion-patterns/{id}` | AIS gaps, renames, re-flagging, IMO conflicts, dark vessels, `position_anomaly` (impossible speed/jump - spoofing), `spoofing_cluster` (3+ hulls with implausible positions in one ~11 km cell; `details.vessels` lists them) |
 | `GET /transshipment?hours=&min_confidence=` / `PATCH /transshipment/{id}` | Ship-to-ship rendezvous candidates |
 | `GET /port-calls?hours=&port=&risk=&only_flagged=&open_only=` and `GET /port-calls/{24h|7d|30d}` | Port calls with dwell times and flags (`sanctioned_facility`, `unusual_dwell_time`, ...) plus per-port totals |
 | `GET /ports` | Curated port reference as GeoJSON |

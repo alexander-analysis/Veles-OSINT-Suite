@@ -38,7 +38,11 @@ vessel's status and risk score; every change is audited. Switch the view to
 zone), renames, re-flagging, identity conflicts (an IMO reappearing under a
 different MMSI), dark flagged vessels, and *position anomalies* - physically
 impossible reports (a ship inland, 40 knots) that point at GNSS spoofing or a
-manipulated transponder.
+manipulated transponder. When `spoofing_min_vessels` (3) or more hulls report
+implausible positions inside the same ~11 km within `spoofing_window_hours`,
+they are rolled up into one *GNSS spoofing cluster* event (high when 5+ hulls
+or the spot is on land, critical at 10+) listing every vessel caught in it -
+the signature of a jammer or spoofer rather than one bad transponder.
 
 **Transshipment** - pairs of slow cargo vessels within the proximity threshold,
 away from ports, for at least the configured duration; confidence rises with

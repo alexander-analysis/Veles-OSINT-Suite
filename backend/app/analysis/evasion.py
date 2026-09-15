@@ -4,6 +4,7 @@ All functions are pure: they take the stored vessel state plus the incoming
 report and return ``EvasionIndicator`` records for the bot to persist.
 """
 
+from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -209,4 +210,92 @@ def dark_vessel_indicator(vessel, now: datetime, threshold_hours: float) -> Evas
         lon=vessel.current_position_lon,
         summary=f"{vessel.name} ({vessel.sanctioned_status}) silent for {hours:.1f} h, last seen {describe_location(vessel.current_position_lat, vessel.current_position_lon)}",
         details={"hours_silent": round(hours, 1), "zones": zones, "sanctioned_status": vessel.sanctioned_status},
+    )
+
+
+# ------------------------------------------------------------- GNSS spoofing
+@dataclass
+class SpoofingCluster:
+    lat: float
+    lon: float
+    vessels: list[dict]  # {mmsi, name, flag, ship_type, reason}
+    inland: bool
+    zones: list[str]
+    first_seen: datetime
+    last_seen: datetime
+    anomaly_ids: list[int]
+
+    @property
+    def severity(self) -> str:
+        n = len(self.vessels)
+        if n >= 10 or (self.inland and n >= 5):
+            return "critical"
+        if n >= 5 or self.inland:
+            return "high"
+        return "medium"
+
+
+def spoofing_clusters(anomalies: list, min_vessels: int = 3, cell_deg: float = 0.1) -> list[SpoofingCluster]:
+    """Group recent position anomalies into spatial clusters - several hulls jumping to the same spot is the signature
+    of GNSS spoofing or jamming (ships "parked" on an airport inland, or stacked on one coordinate off a naval base),
+    not of one ship's faulty transponder.
+
+    ``anomalies`` are evasion events of type ``position_anomaly`` with a location.  Cells are ~11 km; a cluster is the
+    3x3 neighbourhood around the densest cell, taken greedily until no neighbourhood holds ``min_vessels`` distinct hulls.
+    """
+    from app.analysis import landmask
+
+    cells: dict[tuple[int, int], list] = defaultdict(list)
+    for a in anomalies:
+        if a.location_lat is None or a.location_lon is None:
+            continue
+        cells[(int(a.location_lat // cell_deg), int(a.location_lon // cell_deg))].append(a)
+
+    def neighbourhood(key):
+        r, c = key
+        return [(r + dr, c + dc) for dr in (-1, 0, 1) for dc in (-1, 0, 1)]
+
+    clusters: list[SpoofingCluster] = []
+    while cells:
+        best_key, best_vessels = None, 0
+        for key in cells:
+            hulls = {a.vessel_id for k in neighbourhood(key) for a in cells.get(k, [])}
+            if len(hulls) > best_vessels:
+                best_key, best_vessels = key, len(hulls)
+        if best_vessels < min_vessels:
+            break
+        members = [a for k in neighbourhood(best_key) for a in cells.pop(k, [])]
+        by_vessel: dict[int, object] = {}
+        for a in sorted(members, key=lambda a: a.timestamp):
+            by_vessel[a.vessel_id] = a  # latest anomaly per hull
+        lat = sum(a.location_lat for a in members) / len(members)
+        lon = sum(a.location_lon for a in members) / len(members)
+        vessels = []
+        for a in by_vessel.values():
+            vessel = getattr(a, "vessel", None)
+            reasons = (a.details or {}).get("reasons") or []
+            vessels.append({"mmsi": a.mmsi, "name": getattr(vessel, "name", None), "flag": getattr(vessel, "flag_state", None), "ship_type": getattr(vessel, "ship_type", None),
+                            "reason": reasons[0] if reasons else (a.summary or "")[:120]})
+        clusters.append(SpoofingCluster(lat=round(lat, 4), lon=round(lon, 4), vessels=vessels, inland=landmask.is_inland(lat, lon, margin_km=5.0),
+                                        zones=[z.name for z in zones_containing(lat, lon)], first_seen=min(a.timestamp for a in members), last_seen=max(a.timestamp for a in members),
+                                        anomaly_ids=sorted(a.id for a in members if a.id is not None)))
+    return clusters
+
+
+def spoofing_indicator(cluster: SpoofingCluster) -> EvasionIndicator:
+    n = len(cluster.vessels)
+    where = describe_location(cluster.lat, cluster.lon)
+    context = " on land" if cluster.inland else ""
+    zone = f" inside {', '.join(cluster.zones)}" if cluster.zones else ""
+    types = Counter((v.get("ship_type") or "unknown").split(" ")[0].lower() for v in cluster.vessels)
+    return EvasionIndicator(
+        event_type="spoofing_cluster",
+        severity=cluster.severity,
+        confidence=round(min(0.95, 0.5 + 0.05 * n + (0.15 if cluster.inland else 0.0)), 2),
+        timestamp=cluster.last_seen,
+        lat=cluster.lat,
+        lon=cluster.lon,
+        summary=f"GNSS spoofing/jamming signature: {n} vessels report implausible positions{context} {where}{zone} between {cluster.first_seen:%H:%M} and {cluster.last_seen:%H:%M} UTC",
+        details={"vessel_count": n, "vessels": cluster.vessels[:40], "inland": cluster.inland, "zones": cluster.zones, "types": dict(types), "anomaly_ids": cluster.anomaly_ids[:200],
+                 "first_seen": cluster.first_seen.isoformat(), "last_seen": cluster.last_seen.isoformat()},
     )

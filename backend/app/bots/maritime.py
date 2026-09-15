@@ -22,9 +22,10 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from sqlalchemy import delete, func, insert, or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.analysis import evasion, ports as port_rules, transshipment as sts
+from app.analysis.geospatial import haversine_m
 from app.analysis.geospatial import describe_location, lanes_containing, port_containing, zones_containing
 from app.analysis.risk import compute_risk_score
 from app import notifications
@@ -671,6 +672,45 @@ class MaritimeBot:
         return created
 
     # -------------------------------------------------------------- risk score
+    async def detect_spoofing(self) -> int:
+        """Runs the synchronous body in a worker thread so the bot loop keeps serving streams."""
+        return await asyncio.to_thread(self._detect_spoofing_sync)
+
+    def _detect_spoofing_sync(self) -> int:
+        cfg = self.config()
+        window = timedelta(hours=float(cfg.get("spoofing_window_hours", 3)))
+        min_vessels = int(cfg.get("spoofing_min_vessels", 3))
+        now = utcnow()
+        created = 0
+        with SessionLocal() as db:
+            anomalies = db.execute(
+                select(EvasionEvent).options(selectinload(EvasionEvent.vessel)).where(EvasionEvent.event_type == "position_anomaly", EvasionEvent.timestamp >= now - window, EvasionEvent.location_lat.is_not(None))
+            ).scalars().all()
+            if len(anomalies) < min_vessels:
+                return 0
+            recent = db.execute(select(EvasionEvent).where(EvasionEvent.event_type == "spoofing_cluster", EvasionEvent.timestamp >= now - window - timedelta(hours=6))).scalars().all()
+            for cluster in evasion.spoofing_clusters(anomalies, min_vessels=min_vessels):
+                # the same spot reported within the window: refresh the existing event instead of stacking duplicates
+                match = next((e for e in recent if e.location_lat is not None and haversine_m(e.location_lat, e.location_lon, cluster.lat, cluster.lon) <= 25_000), None)
+                indicator = evasion.spoofing_indicator(cluster)
+                if match:
+                    if len(cluster.vessels) >= (match.details or {}).get("vessel_count", 0):
+                        match.timestamp, match.severity, match.confidence_score = indicator.timestamp, indicator.severity, indicator.confidence
+                        match.summary, match.details = indicator.summary[:300], indicator.details
+                    continue
+                anchor = max((a.vessel for a in anomalies if a.vessel and a.mmsi in {v["mmsi"] for v in cluster.vessels}), key=lambda v: (v.risk_score or 0, v.mmsi), default=None)
+                if anchor is None:
+                    continue
+                self._add_evasion(db, anchor, indicator)
+                db.add(AuditLog(action_type="spoofing_cluster_detected", user_id="system", vessel_id=anchor.id, rationale=indicator.summary,
+                                supporting_data={"vessel_count": len(cluster.vessels), "vessels": [v["mmsi"] for v in cluster.vessels][:40], "inland": cluster.inland, "zones": cluster.zones},
+                                source_systems=["bots.maritime"], created_by="system"))
+                self.touched.update(a.vessel_id for a in anomalies if a.mmsi in {v["mmsi"] for v in cluster.vessels})
+                log.warning("spoofing cluster [{}]: {}", indicator.severity, indicator.summary)
+                created += 1
+            db.commit()
+        return created
+
     async def update_risk_scores(self, limit: int = 2000) -> int:
         """Runs the synchronous body in a worker thread so the bot loop keeps serving streams."""
         return await asyncio.to_thread(self._update_risk_scores_sync, limit)

@@ -181,6 +181,7 @@ def register_maritime_jobs() -> None:
     scheduler.add_job(_on_loop(maritime_bot.detect_transshipments, timeout=300), "interval", minutes=5, id="maritime.detect_transshipments", replace_existing=True)
     scheduler.add_job(_on_loop(maritime_bot.detect_port_calls, timeout=300), "interval", minutes=5, id="maritime.detect_port_calls", replace_existing=True)
     scheduler.add_job(_on_loop(maritime_bot.detect_dark_vessels, timeout=300), "interval", minutes=15, id="maritime.detect_dark_vessels", replace_existing=True)
+    scheduler.add_job(_on_loop(maritime_bot.detect_spoofing, timeout=300), "interval", minutes=int(maritime.get("spoofing_interval_minutes", 20)), id="maritime.detect_spoofing", replace_existing=True)
     scheduler.add_job(_on_loop(maritime_bot.update_risk_scores, timeout=600), "interval", minutes=int(sanctions.get("check_maritime_interval_minutes", 30)), id="maritime.update_risk_scores", replace_existing=True)
     scheduler.add_job(_on_loop(maritime_bot.cleanup_old_data, timeout=1800), "cron", hour=int(retention.get("purge_hour_utc", 2)), minute=30, id="maritime.cleanup_old_data", replace_existing=True)
     scheduler.add_job(_on_loop(maritime_bot.fetch_ais_positions, timeout=int(maritime.get("ais_ingest_timeout_seconds", 300))), id="maritime.initial_fetch", replace_existing=True)

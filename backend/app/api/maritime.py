@@ -280,7 +280,7 @@ def _evasion_view(e: EvasionEvent, vessel: Vessel | None = None) -> dict[str, An
 
 @router.get("/evasion-patterns")
 def get_evasion_patterns(
-    event_type: str | None = Query(None, description="ais_gap, name_change, flag_change, identity_conflict, dark_in_zone, dark_vessel"),
+    event_type: str | None = Query(None, description="ais_gap, name_change, flag_change, identity_conflict, dark_in_zone, dark_vessel, position_anomaly, spoofing_cluster"),
     severity: str | None = None,
     hours: int = Query(24 * 7, ge=1),
     limit: int = Query(100, ge=1, le=1000),

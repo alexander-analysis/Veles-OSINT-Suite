@@ -307,3 +307,29 @@ def test_land_mask():
     assert not landmask.is_land(42.0, 50.0)  # the Caspian is a hole in the Eurasian polygon
     assert landmask.is_land(23.0, 10.0) and landmask.coast_distance_km(23.0, 10.0) is None  # deep Sahara
     assert not landmask.is_inland(-6.07, 106.895)  # Jakarta anchorage: sea within the coastal margin
+
+
+def test_spoofing_cluster_detection(client, maritime_setup):
+    """Four hulls jumping to one inland spot near Novorossiysk within an hour -> one spoofing_cluster event (jump-based anomalies)."""
+    from app.database import SessionLocal
+    from app.models.maritime import EvasionEvent, Vessel
+
+    bot = maritime_setup
+    cfg = bot.config()
+    spot = (44.70, 37.60)  # ~20 km inland, east of Novorossiysk
+    fleet = [f"27399{i:04d}" for i in range(4)]
+    bot._ingest([_pos(m, 43.0, 35.0 + i * 0.1, 70, name=f"SPOOFED {i}", ship_type="Tanker", speed=10.0) for i, m in enumerate(fleet)], cfg)
+    stats = bot._ingest([_pos(m, spot[0] + i * 0.01, spot[1] + i * 0.01, 5, name=f"SPOOFED {i}", ship_type="Tanker", speed=10.0) for i, m in enumerate(fleet)], cfg)
+    assert stats["position_anomalies"] == 4
+    assert bot._detect_spoofing_sync() == 1
+    assert bot._detect_spoofing_sync() == 0  # refreshed, not duplicated
+    with SessionLocal() as db:
+        event = db.query(EvasionEvent).filter_by(event_type="spoofing_cluster").order_by(EvasionEvent.id.desc()).first()
+        assert event.details["vessel_count"] == 4 and event.details["inland"] and event.severity == "high"
+        assert "GNSS spoofing" in event.summary and {v["mmsi"] for v in event.details["vessels"]} == set(fleet)
+        anchor = db.get(Vessel, event.vessel_id)
+        assert anchor.mmsi in fleet
+    listing = client.get("/api/maritime/evasion-patterns?event_type=spoofing_cluster").json()
+    assert listing["by_type"]["spoofing_cluster"] >= 1 and any(r["details"]["vessel_count"] == 4 for r in listing["events"])
+    # analysis helper on its own: two hulls are not a cluster
+    assert evasion.spoofing_clusters([], min_vessels=3) == []

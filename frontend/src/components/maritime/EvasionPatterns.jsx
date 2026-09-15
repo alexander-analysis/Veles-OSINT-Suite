@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import clsx from 'clsx';
-import { EyeOff, Flag, Tag, Fingerprint, Radio, MapPinOff } from 'lucide-react';
+import { EyeOff, Flag, Tag, Fingerprint, Radio, MapPinOff, SatelliteDish } from 'lucide-react';
 import { useFetch } from '../../hooks/useFetch';
 import LoadingSpinner from '../common/LoadingSpinner';
 
-const ICONS = { ais_gap: Radio, name_change: Tag, flag_change: Flag, identity_conflict: Fingerprint, dark_in_zone: EyeOff, dark_vessel: EyeOff, position_anomaly: MapPinOff };
+const ICONS = { ais_gap: Radio, name_change: Tag, flag_change: Flag, identity_conflict: Fingerprint, dark_in_zone: EyeOff, dark_vessel: EyeOff, position_anomaly: MapPinOff, spoofing_cluster: SatelliteDish };
 const SEVERITY = { critical: 'border-red-900 bg-red-50', high: 'border-red bg-red-50', medium: 'border-orange bg-orange-50', low: 'border-gray-300 bg-white' };
-const LABEL = { ais_gap: 'AIS gap', name_change: 'name change', flag_change: 'flag change', identity_conflict: 'identity conflict', dark_in_zone: 'dark in zone', dark_vessel: 'dark vessel', position_anomaly: 'position anomaly (spoofing?)' };
+const LABEL = { ais_gap: 'AIS gap', name_change: 'name change', flag_change: 'flag change', identity_conflict: 'identity conflict', dark_in_zone: 'dark in zone', dark_vessel: 'dark vessel', position_anomaly: 'position anomaly (spoofing?)', spoofing_cluster: 'GNSS spoofing cluster' };
 
 /** AIS gaps, renames, re-flagging, identity conflicts and dark vessels. */
 export default function EvasionPatterns() {
@@ -35,7 +35,7 @@ export default function EvasionPatterns() {
       </div>
       {loading && !data && <LoadingSpinner />}
       {error && <div className="text-sm text-red-700">{error.message}</div>}
-      {data?.events?.length === 0 && <p className="text-sm text-gray-500">No evasion indicators in this window. Detectors: AIS gaps over the configured threshold, renames, re-flagging, IMO conflicts, dark flagged vessels.</p>}
+      {data?.events?.length === 0 && <p className="text-sm text-gray-500">No evasion indicators in this window. Detectors: AIS gaps over the configured threshold, renames, re-flagging, IMO conflicts, dark flagged vessels, implausible positions and GNSS spoofing clusters.</p>}
       <div className="space-y-2 max-h-[34rem] overflow-y-auto pr-1">
         {data?.events?.map((e) => {
           const Icon = ICONS[e.event_type] || EyeOff;
@@ -50,6 +50,12 @@ export default function EvasionPatterns() {
                 <span className="text-xs text-gray-500 whitespace-nowrap">{new Date(e.timestamp).toLocaleString()}</span>
               </div>
               <p className="mt-1 text-gray-700">{e.summary}</p>
+              {e.event_type === 'spoofing_cluster' && e.details?.vessels?.length > 0 && (
+                <ul className="mt-1 text-xs text-gray-600 flex flex-wrap gap-x-3 gap-y-0.5">
+                  {e.details.vessels.slice(0, 12).map((v) => <li key={v.mmsi}><Link to={`/maritime/vessel/${v.mmsi}`} className="text-steel-700 hover:underline">{v.name || v.mmsi}</Link>{v.flag ? ` (${v.flag})` : ''}{v.ship_type ? ` ${v.ship_type.toLowerCase()}` : ''}</li>)}
+                  {e.details.vessels.length > 12 && <li>+{e.details.vessels.length - 12} more</li>}
+                </ul>
+              )}
               <div className="mt-1 text-xs text-gray-500">confidence {Math.round((e.confidence_score || 0) * 100)}% - status {e.investigation_status}</div>
             </div>
           );

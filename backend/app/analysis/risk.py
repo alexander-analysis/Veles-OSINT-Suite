@@ -61,6 +61,11 @@ def compute_risk_score(db: Session, vessel: Vessel, days: int = 30) -> tuple[flo
         weights.append(min(0.5, 0.2 * sts))
         factors["transshipments"] = sts
 
+    spoofed = db.execute(select(func.count(EvasionEvent.id)).where(EvasionEvent.vessel_id == vessel.id, EvasionEvent.event_type == "spoofing_cluster", EvasionEvent.timestamp >= utcnow() - timedelta(days=30))).scalar() or 0
+    if spoofed:
+        weights.append(0.1)
+        factors["spoofing_clusters_30d"] = spoofed
+
     if vessel.imo:
         from app.models.tier2 import PscEvent
 

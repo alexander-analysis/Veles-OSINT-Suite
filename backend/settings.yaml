@@ -62,6 +62,10 @@ maritime:
   review_queue_min_confidence: 0.4
   transshipment_proximity_meters: 500
   transshipment_min_duration_minutes: 30
+  # GNSS spoofing / jamming: N distinct hulls with implausible positions inside ~11 km within the window
+  spoofing_interval_minutes: 20
+  spoofing_window_hours: 3
+  spoofing_min_vessels: 3
   transshipment_cluster_limit: 8  # slow vessels within ~6 km that mark an anchorage / marina (pairs there need a typed tanker)
   transshipment_max_duration_hours: 48  # continuous contact beyond this is a berthed or laid-up pair, dismissed automatically
   ais_gap_threshold_hours: 6

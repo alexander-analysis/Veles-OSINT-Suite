@@ -20,7 +20,14 @@ cloudflared tunnel --url http://localhost:80
 ```
 
 The command prints a `https://<random>.trycloudflare.com` URL. It is only
-valid while the command runs.
+valid while the command runs. The userspace installer
+(`deployment/userspace/install.sh`) runs exactly this as the
+`cloudflared-veles` user unit and leaves it alone on redeploys, so the URL
+only changes when the Pi reboots or the unit is restarted by hand:
+
+```bash
+grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' ~/veles/logs/cloudflared-veles.log | tail -1
+```
 
 ## Option B - named tunnel (stable hostname, runs as a service)
 
