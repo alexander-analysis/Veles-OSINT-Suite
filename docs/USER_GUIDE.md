@@ -42,7 +42,12 @@ manipulated transponder.
 
 **Transshipment** - pairs of slow cargo vessels within the proximity threshold,
 away from ports, for at least the configured duration; confidence rises with
-duration, tanker involvement, zone context and the vessels' own risk.
+duration, tanker involvement, zone context and the vessels' own risk. Marina
+and anchorage noise is filtered: a pair needs at least one typed tanker or
+cargo hull, inside a crowded cluster (`transshipment_cluster_limit` slow
+vessels within ~6 km) it needs a tanker, moored hulls and fishing boats never
+pair, and a contact that stays continuous beyond
+`transshipment_max_duration_hours` is dismissed as a berthed or laid-up pair.
 
 **Port activity** - calls at sanctioned / high-risk facilities with dwell times
 and flags (`sanctioned_facility`, `unusual_dwell_time`,

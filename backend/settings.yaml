@@ -62,6 +62,8 @@ maritime:
   review_queue_min_confidence: 0.4
   transshipment_proximity_meters: 500
   transshipment_min_duration_minutes: 30
+  transshipment_cluster_limit: 8  # slow vessels within ~6 km that mark an anchorage / marina (pairs there need a typed tanker)
+  transshipment_max_duration_hours: 48  # continuous contact beyond this is a berthed or laid-up pair, dismissed automatically
   ais_gap_threshold_hours: 6
   unusual_dwell_time_hours: 72
 
@@ -98,6 +100,7 @@ geopolitical:
   correlation_window_hours: 24
   correlation_min_severity: medium
   min_correlation_score: 0.55
+  max_correlations_per_event: 40  # strongest links kept per event and run
   # Instant notification (webhook / e-mail) for new events at or above this severity
   alert_min_severity: critical
 

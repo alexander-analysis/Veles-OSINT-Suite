@@ -288,27 +288,30 @@ class GeopoliticalBot:
         cfg = _config()
         if not cfg.get("enabled", True):
             return {"skipped": "disabled"}
-        result = await asyncio.to_thread(self._correlate, float(cfg.get("correlation_window_hours", 24)), float(cfg.get("min_correlation_score", 0.55)), str(cfg.get("correlation_min_severity", "medium")))
+        result = await asyncio.to_thread(self._correlate, float(cfg.get("correlation_window_hours", 24)), float(cfg.get("min_correlation_score", 0.55)), str(cfg.get("correlation_min_severity", "medium")), int(cfg.get("max_correlations_per_event", 40)))
         self.last_run["correlate"] = utcnow()
         self.last_result["correlate"] = result
         log.info("correlation: {}", result)
         return result
 
     @staticmethod
-    def _signals(db: Session, start: datetime, end: datetime) -> list[dict[str, Any]]:
+    def _signals(db: Session, start: datetime, end: datetime, per_kind: int = 600) -> list[dict[str, Any]]:
+        """Signals worth correlating; each kind is capped and filtered to notable rows so a busy AIS day cannot swamp the run."""
         signals: list[dict[str, Any]] = []
-        for alert in db.execute(select(MarketAlert).where(MarketAlert.timestamp.between(start, end))).scalars():
+        for alert in db.execute(select(MarketAlert).where(MarketAlert.timestamp.between(start, end)).order_by(MarketAlert.timestamp.desc()).limit(per_kind)).scalars():
             signals.append({"kind": "market_alert", "id": alert.id, "time": alert.timestamp, "sector": ASSET_SECTORS.get(alert.asset, "finance"), "countries": [],
                             "summary": alert.summary or f"{alert.asset} {alert.alert_type} ({alert.severity})", "severity": alert.severity})
-        for breach in db.execute(select(SanctionsBreach).where(SanctionsBreach.timestamp.between(start, end))).scalars():
+        for breach in db.execute(select(SanctionsBreach).where(SanctionsBreach.timestamp.between(start, end)).order_by(SanctionsBreach.match_confidence.desc().nulls_last()).limit(per_kind)).scalars():
             signals.append({"kind": "sanctions_breach", "id": breach.id, "time": breach.timestamp, "sector": "shipping", "countries": [c for c in (breach.flag,) if c],
                             "summary": f"{breach.sanctioning_authority} match: {breach.vessel_name} -> {breach.sanctioned_entity_name}", "severity": breach.severity})
+        notable = EvasionEvent.severity.in_(["medium", "high", "critical"])
         flags = dict(db.execute(select(Vessel.id, Vessel.flag_state).where(Vessel.id.in_(
-            select(EvasionEvent.vessel_id).where(EvasionEvent.timestamp.between(start, end))))).all())
-        for ev in db.execute(select(EvasionEvent).where(EvasionEvent.timestamp.between(start, end))).scalars():
+            select(EvasionEvent.vessel_id).where(EvasionEvent.timestamp.between(start, end), notable)))).all())
+        for ev in db.execute(select(EvasionEvent).where(EvasionEvent.timestamp.between(start, end), notable).order_by(EvasionEvent.timestamp.desc()).limit(per_kind)).scalars():
             signals.append({"kind": "evasion_event", "id": ev.id, "time": ev.timestamp, "sector": "shipping", "countries": [c for c in (flags.get(ev.vessel_id),) if c],
                             "summary": ev.summary or f"{ev.event_type} {ev.mmsi}", "severity": ev.severity})
-        for sts in db.execute(select(TransshipmentEvent).where(TransshipmentEvent.timestamp.between(start, end))).scalars():
+        for sts in db.execute(select(TransshipmentEvent).where(TransshipmentEvent.timestamp.between(start, end), TransshipmentEvent.confidence_score >= 0.6, TransshipmentEvent.investigation_status != "dismissed")
+                              .order_by(TransshipmentEvent.confidence_score.desc()).limit(per_kind)).scalars():
             signals.append({"kind": "transshipment", "id": sts.id, "time": sts.timestamp, "sector": "shipping", "countries": [],
                             "summary": f"STS candidate {sts.vessel_a_mmsi}/{sts.vessel_b_mmsi} ({(sts.confidence_score or 0):.2f})", "severity": "medium"})
         rows = db.execute(
@@ -321,7 +324,7 @@ class GeopoliticalBot:
         return signals
 
     @staticmethod
-    def _correlate(window_hours: float, min_score: float, min_severity: str) -> dict[str, Any]:
+    def _correlate(window_hours: float, min_score: float, min_severity: str, per_event: int = 40) -> dict[str, Any]:
         now = utcnow()
         with SessionLocal() as db:
             events = db.execute(
@@ -347,6 +350,7 @@ class GeopoliticalBot:
             for event in events:
                 sectors = list(event.affected_sectors or [])
                 countries = list(event.affected_countries or [])
+                scored: list[tuple[float, dict[str, Any], list[str]]] = []
                 for signal in signals:
                     key = (event.id, signal["kind"], signal["id"])
                     if key in existing:
@@ -360,6 +364,10 @@ class GeopoliticalBot:
                     score = round(0.7 * r_score + 0.3 * t_score, 3)
                     if score < min_score:
                         continue
+                    scored.append((score, signal, shared))
+                scored.sort(key=lambda item: -item[0])
+                for score, signal, shared in scored[:per_event]:  # keep the strongest links only - a busy day must not bury an event in noise
+                    key = (event.id, signal["kind"], signal["id"])
                     delta = int((signal["time"] - event.event_date).total_seconds() // 60)
                     direction = "simultaneous" if abs(delta) <= 15 else ("after" if delta > 0 else "before")
                     ctype = "geographic" if any(k.startswith("country:") for k in shared) else ("topical" if shared else "temporal")

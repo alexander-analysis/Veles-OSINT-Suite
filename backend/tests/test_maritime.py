@@ -69,6 +69,16 @@ def test_transshipment_pairs_duration_and_assessment():
     in_port_b = VesselStub(mmsi="F", current_position_lat=PRIMORSK[0] + 0.001, current_position_lon=PRIMORSK[1], current_speed=0.0)
     pairs = sts.find_proximity_pairs([a, b, fast, tug, in_port_a, in_port_b], proximity_meters=500)
     assert [(p[0].mmsi, p[1].mmsi) for p in pairs] == [("A", "B")]
+    # marina / anchorage noise: two untyped craft, a moored hull and a fishing boat by name never pair up
+    yacht_a = VesselStub(mmsi="Y1", current_position_lat=OPEN_SEA[0], current_position_lon=OPEN_SEA[1], current_speed=0.0, ship_type=None)
+    yacht_b = VesselStub(mmsi="Y2", current_position_lat=OPEN_SEA[0] + 0.001, current_position_lon=OPEN_SEA[1], current_speed=0.0, ship_type=None)
+    moored = VesselStub(mmsi="M1", current_position_lat=OPEN_SEA[0], current_position_lon=OPEN_SEA[1], current_speed=0.0, ship_type="Cargo", ais_status="moored")
+    trawler = VesselStub(mmsi="T1", name="F/V TAHITIAN TUNA", current_position_lat=OPEN_SEA[0], current_position_lon=OPEN_SEA[1], current_speed=0.0, ship_type=None)
+    assert sts.find_proximity_pairs([yacht_a, yacht_b, moored, trawler], proximity_meters=500) == []
+    # a crowded anchorage only yields typed tanker pairings
+    crowd = [VesselStub(mmsi=f"C{i}", current_position_lat=OPEN_SEA[0] + 0.004 * i, current_position_lon=OPEN_SEA[1], current_speed=0.0, ship_type="Cargo") for i in range(9)]
+    dense_pairs = sts.find_proximity_pairs([a, b, *crowd], proximity_meters=500, cluster_limit=8)
+    assert dense_pairs and all("A" in (p[0].mmsi, p[1].mmsi) and p[3] >= 8 for p in dense_pairs)  # every pair involves the tanker; cargo-cargo rafts are dropped
 
     class Fix:
         def __init__(self, minutes_ago, lat, lon):
@@ -80,6 +90,8 @@ def test_transshipment_pairs_duration_and_assessment():
     assert duration == 90 and started is not None
     candidate = sts.assess_candidate(a, b, 220, duration, started, 30, utcnow())
     assert candidate is not None and candidate.confidence >= 0.55 and "within 220 m for 90 min" in candidate.summary
+    crowded = sts.assess_candidate(a, b, 220, duration, started, 30, utcnow(), neighbours=12, cluster_limit=8)
+    assert crowded.confidence == round(candidate.confidence - 0.1, 2) and crowded.evidence["neighbours"] == 12
     assert sts.assess_candidate(a, b, 220, 10, started, 30, utcnow()) is None
 
 

@@ -538,29 +538,40 @@ class MaritimeBot:
         min_duration = int(cfg.get("transshipment_min_duration_minutes", 30))
         now = utcnow()
         created = 0
+        cluster_limit = int(cfg.get("transshipment_cluster_limit", 8))
+        max_duration = timedelta(hours=float(cfg.get("transshipment_max_duration_hours", 48)))
         with SessionLocal() as db:
             max_speed = float(cfg.get("transshipment_max_speed_knots", 1.5))
             recent = db.execute(select(Vessel).where(Vessel.last_ais_update >= now - timedelta(minutes=30), Vessel.current_position_lat.isnot(None), Vessel.current_speed <= max_speed)).scalars().all()
-            pairs = sts.find_proximity_pairs(recent, proximity, max_speed)
+            pairs = sts.find_proximity_pairs(recent, proximity, max_speed, cluster_limit=cluster_limit)
             window = timedelta(hours=8)
-            for a, b, distance in pairs:
+            for a, b, distance, neighbours in pairs:
                 history_a = db.execute(select(VesselPosition).where(VesselPosition.vessel_id == a.id, VesselPosition.timestamp >= now - window)).scalars().all()
                 history_b = db.execute(select(VesselPosition).where(VesselPosition.vessel_id == b.id, VesselPosition.timestamp >= now - window)).scalars().all()
                 duration, started = sts.proximity_duration(history_a, history_b, proximity, window)
-                candidate = sts.assess_candidate(a, b, distance, duration, started, min_duration, now)
+                candidate = sts.assess_candidate(a, b, distance, duration, started, min_duration, now, neighbours=neighbours, cluster_limit=cluster_limit)
                 if candidate is None:
                     continue
+                # The latest recorded rendezvous of this pair: extend it while the contact is continuous instead of
+                # opening a new event every time the 8 h look-back window slides past the old start time.
                 existing = db.execute(
                     select(TransshipmentEvent).where(
                         or_((TransshipmentEvent.vessel_a_id == a.id) & (TransshipmentEvent.vessel_b_id == b.id), (TransshipmentEvent.vessel_a_id == b.id) & (TransshipmentEvent.vessel_b_id == a.id)),
-                        TransshipmentEvent.timestamp >= candidate.started_at - timedelta(hours=2),
-                    )
-                ).scalar_one_or_none()
-                if existing:
-                    existing.duration_minutes = max(existing.duration_minutes or 0, candidate.duration_minutes)
-                    existing.confidence_score = max(existing.confidence_score or 0, candidate.confidence)
+                        TransshipmentEvent.timestamp >= now - timedelta(days=7),
+                    ).order_by(TransshipmentEvent.timestamp.desc()).limit(1)
+                ).scalars().first()
+                candidate_end = candidate.started_at + timedelta(minutes=candidate.duration_minutes)
+                if existing and existing.timestamp + timedelta(minutes=existing.duration_minutes or 0) >= candidate.started_at - timedelta(hours=2) and existing.timestamp <= candidate_end:
+                    total = int((candidate_end - existing.timestamp).total_seconds() // 60)
+                    existing.duration_minutes = max(existing.duration_minutes or 0, candidate.duration_minutes, total)
                     existing.proximity_meters = min(existing.proximity_meters or distance, distance)
                     existing.supporting_evidence = candidate.evidence
+                    if timedelta(minutes=existing.duration_minutes) > max_duration:
+                        if existing.investigation_status == "possible":
+                            existing.investigation_status = "dismissed"
+                            existing.analyst_notes = f"continuous contact for {existing.duration_minutes // 60} h exceeds the {max_duration.total_seconds() / 3600:.0f} h transfer ceiling - berthed or laid-up pair"
+                    else:
+                        existing.confidence_score = max(existing.confidence_score or 0, candidate.confidence)
                     continue
                 event = TransshipmentEvent(
                     vessel_a_id=a.id, vessel_b_id=b.id, vessel_a_mmsi=a.mmsi, vessel_b_mmsi=b.mmsi, timestamp=candidate.started_at, location_lat=candidate.lat, location_lon=candidate.lon,

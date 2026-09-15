@@ -13,8 +13,10 @@ from datetime import datetime, timedelta
 
 from app.analysis.geospatial import describe_location, haversine_m, nearest_port, zones_containing
 
-CARGO_TYPES = ("tanker", "cargo", "other", None)  # types that plausibly transfer cargo
-EXCLUDED_TYPES = ("tug", "pilot", "passenger", "fishing", "search and rescue", "port tender", "sailing", "pleasure", "law enforcement", "military", "dredging")
+CARGO_TYPES = ("tanker", "cargo")  # typed hulls that plausibly transfer cargo
+EXCLUDED_TYPES = ("tug", "pilot", "passenger", "fishing", "search and rescue", "port tender", "sailing", "pleasure", "law enforcement", "military", "dredging", "hsc", "wing in ground", "diving", "towing")
+FISHING_NAME_HINTS = ("F/V", "F\\V", "FV ", "MFV", "FISHING", "TRAWLER")
+MOORED_STATUSES = ("moored", "aground")
 
 
 @dataclass
@@ -33,15 +35,36 @@ class TransshipmentCandidate:
 
 def _plausible(vessel) -> bool:
     ship_type = (vessel.ship_type or "").lower()
-    return not any(excluded in ship_type for excluded in EXCLUDED_TYPES)
+    if any(excluded in ship_type for excluded in EXCLUDED_TYPES):
+        return False
+    name = (getattr(vessel, "name", None) or "").upper()
+    if any(name.startswith(hint) or (hint in name and len(hint) > 3) for hint in FISHING_NAME_HINTS):
+        return False
+    return (getattr(vessel, "ais_status", None) or "") not in MOORED_STATUSES  # alongside a berth is not a rendezvous
+
+
+def _typed(vessel) -> bool:
+    ship_type = (vessel.ship_type or "").lower()
+    return any(kind in ship_type for kind in CARGO_TYPES)
+
+
+def _tanker(vessel) -> bool:
+    return "tanker" in (vessel.ship_type or "").lower()
 
 
 def _stationary(vessel, max_speed: float) -> bool:
     return vessel.current_speed is not None and vessel.current_speed <= max_speed
 
 
-def find_proximity_pairs(vessels: list, proximity_meters: float, max_speed_knots: float = 1.5, min_port_distance_km: float = 3.0) -> list[tuple]:
-    """Pairs of slow, plausible cargo vessels within ``proximity_meters`` of each other and away from ports."""
+def find_proximity_pairs(vessels: list, proximity_meters: float, max_speed_knots: float = 1.5, min_port_distance_km: float = 3.0, cluster_limit: int = 8) -> list[tuple]:
+    """Pairs of slow, plausible cargo vessels within ``proximity_meters`` of each other and away from ports.
+
+    Returns ``(a, b, distance_m, neighbours)`` tuples; ``neighbours`` is the number of slow vessels in the
+    surrounding ~6 km, the anchorage / marina density cue.  Untyped class-B craft rafted together in a
+    marina and barges moored along inland waterways produced tens of thousands of false rendezvous, so a
+    pair needs at least one typed tanker / cargo hull, and inside a dense cluster it needs a tanker and two
+    typed hulls.
+    """
     cell = 0.02  # ~2 km grid cells
     grid: dict[tuple[int, int], list] = defaultdict(list)
     for vessel in vessels:
@@ -53,10 +76,16 @@ def find_proximity_pairs(vessels: list, proximity_meters: float, max_speed_knots
     seen: set[tuple[int, int]] = set()
     for (row, col), members in grid.items():
         neighbours = [v for dr in (-1, 0, 1) for dc in (-1, 0, 1) for v in grid.get((row + dr, col + dc), [])]
+        dense = len(neighbours) >= cluster_limit
         for a in members:
             for b in neighbours:
                 if a.id >= b.id or (a.id, b.id) in seen:
                     continue
+                typed_a, typed_b = _typed(a), _typed(b)
+                if not (typed_a or typed_b):
+                    continue  # two untyped craft: overwhelmingly small boats, not a cargo transfer
+                if dense and not (typed_a and typed_b and (_tanker(a) or _tanker(b))):
+                    continue  # anchorage / harbour cluster: only a typed tanker pairing is worth a look
                 distance = haversine_m(a.current_position_lat, a.current_position_lon, b.current_position_lat, b.current_position_lon)
                 if distance > proximity_meters:
                     continue
@@ -64,7 +93,7 @@ def find_proximity_pairs(vessels: list, proximity_meters: float, max_speed_knots
                 if port:
                     continue  # berthed side by side in port is not an STS transfer
                 seen.add((a.id, b.id))
-                pairs.append((a, b, distance))
+                pairs.append((a, b, distance, len(neighbours)))
     return pairs
 
 
@@ -96,16 +125,18 @@ def proximity_duration(history_a: list, history_b: list, proximity_meters: float
     return int((last_close - start).total_seconds() // 60), start
 
 
-def assess_candidate(a, b, distance_m: float, duration_minutes: int, started_at: datetime | None, min_duration: int, now: datetime) -> TransshipmentCandidate | None:
+def assess_candidate(a, b, distance_m: float, duration_minutes: int, started_at: datetime | None, min_duration: int, now: datetime, neighbours: int = 0, cluster_limit: int = 8) -> TransshipmentCandidate | None:
     if duration_minutes < min_duration:
         return None
     lat = (a.current_position_lat + b.current_position_lat) / 2
     lon = (a.current_position_lon + b.current_position_lon) / 2
     types = {(a.ship_type or "").lower(), (b.ship_type or "").lower()}
-    confidence = 0.4
+    confidence = 0.4 if _typed(a) and _typed(b) else 0.3
     confidence += min(0.25, duration_minutes / 480 * 0.25)  # up to +0.25 for an 8 h rendezvous
     if any("tanker" in t for t in types):
         confidence += 0.15
+    if neighbours >= cluster_limit:
+        confidence -= 0.1  # a crowded anchorage is a weaker signal than two ships alone at sea
     zones = [z.name for z in zones_containing(lat, lon)]
     if zones:
         confidence += 0.1
@@ -133,5 +164,6 @@ def assess_candidate(a, b, distance_m: float, duration_minutes: int, started_at:
             "types": {a.mmsi: a.ship_type, b.mmsi: b.ship_type},
             "zones": zones,
             "risk_flags": [v.mmsi for v in risky],
+            "neighbours": neighbours,
         },
     )

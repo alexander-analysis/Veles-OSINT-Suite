@@ -281,7 +281,9 @@ def relevance(event_sectors: list[str], event_countries: list[str], event_type: 
     score, keys = 0.0, []
     sector = signal.get("sector")
     if sector and sector in event_sectors:
-        score += 0.45
+        # A shared sector carries a market move on its own, but an AIS gap or rendezvous somewhere in the world
+        # needs a country or maritime theme in common too (0.7 * 0.3 + 0.3 stays under the 0.55 floor).
+        score += 0.3 if signal.get("kind") in ("evasion_event", "transshipment") else 0.45
         keys.append(f"sector:{sector}")
     shared = set(event_countries) & set(signal.get("countries") or [])
     if shared:
