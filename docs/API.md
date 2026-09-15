@@ -152,6 +152,7 @@ total notional ($1M/$5M/$20M/$100M), coordination by confidence.
 | `GET /correlations?hours=&correlation_type=&signal_type=&min_confidence=` | Pairwise cross-domain correlations (shared vessel / listed party / wallet / company / facility / country / asset) |
 | `GET /timeline?hours=&bucket_hours=` | Signal counts per bucket per domain |
 | `GET /summary?hours=` | Open / critical composite alerts, correlation counts by type, top alerts |
+| `GET /brief?hours=&format=json|pdf&classification=` | Cross-domain intelligence brief covering every bot (composite alerts, maritime, energy, geopolitical, market, blockchain, corporate, aviation, cyber, information, legal) |
 | `GET /status` / `POST /refresh` | Engine status; run a correlation pass now (202) |
 
 ## Monitors (tier 2 / 3)

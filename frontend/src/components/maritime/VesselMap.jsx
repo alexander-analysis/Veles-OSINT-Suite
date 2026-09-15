@@ -14,6 +14,11 @@ const AUTHORITY_STYLE = {
 
 const ring = (feature) => feature.geometry.coordinates[0].map(([lon, lat]) => [lat, lon]);
 
+// NASA GIBS (keyless WMTS): MODIS Terra true colour for yesterday - clouds, sea ice, smoke plumes and fires near terminals.
+const gibsDate = () => new Date(Date.now() - 36 * 3600 * 1000).toISOString().slice(0, 10);
+const GIBS_URL = `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_CorrectedReflectance_TrueColor/default/${gibsDate()}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg`;
+const GIBS_THERMAL_URL = `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_Thermal_Anomalies_All/default/${gibsDate()}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.png`;
+
 function InvalidateOnMount() {
   // The container is laid out after Leaflet measures it (cards, tabs, fonts loading) - re-measure once settled.
   const map = useMap();
@@ -117,6 +122,12 @@ export default function VesselMap({ vessels, breaches, selectedTrack, height = '
         {fitToData && <FitOnce features={features} />}
         {onViewChange && <ViewportWatcher onViewChange={onViewChange} />}
         <LayersControl position="topright">
+          <LayersControl.Overlay name="Satellite (MODIS true colour, yesterday)">
+            <TileLayer url={GIBS_URL} attribution="NASA GIBS / MODIS Terra" maxNativeZoom={9} maxZoom={19} opacity={0.85} />
+          </LayersControl.Overlay>
+          <LayersControl.Overlay name="Thermal anomalies / fires (MODIS, yesterday)">
+            <TileLayer url={GIBS_THERMAL_URL} attribution="NASA GIBS / MODIS Terra" maxNativeZoom={9} maxZoom={19} />
+          </LayersControl.Overlay>
           <LayersControl.Overlay checked name="OFAC zones">
             <LayerGroup>{zones?.ofac && <ZoneLayer features={zones.ofac.features} styleKey="ofac" />}</LayerGroup>
           </LayersControl.Overlay>

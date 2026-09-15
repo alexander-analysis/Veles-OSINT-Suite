@@ -113,3 +113,7 @@ def test_engine_persists_alerts_and_api(client):
     summary = client.get("/api/fusion/summary?hours=12").json()
     assert summary["composite_alerts"] >= 1 and summary["correlations"] >= 3 and summary["stored_alerts_total"] >= 1
     assert client.get("/api/fusion/status").status_code == 200
+    brief = client.get("/api/fusion/brief?hours=12").json()
+    assert brief["signals"]["total"] >= 4 and brief["composite_alerts"] and "Composite alerts" in brief["sections"]
+    pdf = client.get("/api/fusion/brief?hours=12&format=pdf&classification=CONFIDENTIAL")
+    assert pdf.status_code == 200 and pdf.content[:5] == b"%PDF-" and len(pdf.content) > 3000

@@ -111,6 +111,7 @@ export default function Dashboard() {
             <button type="button" onClick={() => report('/api/maritime/report?days=7&format=pdf', 'VELES_Maritime_Report.pdf')} className="px-2 py-0.5 border border-gray-300 rounded bg-white hover:bg-gray-100">Maritime 7d (PDF)</button>
             <button type="button" onClick={() => report('/api/sanctions/report/7days?format=pdf', 'VELES_Sanctions_Report.pdf')} className="px-2 py-0.5 border border-gray-300 rounded bg-white hover:bg-gray-100">Sanctions 7d (PDF)</button>
             <button type="button" onClick={() => report('/api/market/export/7d?format=pdf', 'VELES_Market_Brief.pdf')} className="px-2 py-0.5 border border-gray-300 rounded bg-white hover:bg-gray-100">Market 7d (PDF)</button>
+            <button type="button" onClick={() => report('/api/fusion/brief?hours=24&format=pdf', 'VELES_Intelligence_Brief.pdf')} className="px-2 py-0.5 border border-steel-700 text-steel-700 rounded bg-white hover:bg-steel-50 font-medium">Cross-domain brief 24h (PDF)</button>
           </div>
         </div>
       </div>

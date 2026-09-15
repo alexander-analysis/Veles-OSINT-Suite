@@ -82,4 +82,5 @@ Nginx (static frontend + /api proxy + WebSocket)  <--  Cloudflare Tunnel  <--  a
 | 5 (ecosystem tier 1) | Energy flow monitor (facility watch, shipment reconstruction, dark-oil indicators, price context) | done |
 | 5 (ecosystem tier 1) | Cross-bot correlation engine: typed signal registry, strong-key clustering, composite alerts, unified queue | done |
 | 6 (ecosystem tier 2 / 3) | Aviation tracker, leak & breach monitor, narrative monitor, domain / hosting footprinting, legal & enforcement monitor - all feeding fusion | done |
-| 7 | Satellite imagery layer, port-authority feeds, keyed sources (Companies House, EIA, FIRMS) | next |
+| 7 | Cross-domain intelligence brief (PDF / JSON), fusion in the daily digest, NASA GIBS satellite / thermal overlays on the map | done |
+| 8 | Keyed sources (Companies House, OpenCorporates, EIA, FIRMS, Etherscan), port-authority feeds, named Cloudflare tunnel | next |

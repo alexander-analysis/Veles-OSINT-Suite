@@ -3,7 +3,7 @@
 from datetime import datetime, timedelta
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -13,6 +13,8 @@ from app.bots.runtime import bot_loop
 from app.database import get_db
 from app.models.audit import AuditLog
 from app.models.correlation import CompositeAlert, SignalCorrelation
+from app.reports.fusion_brief import fusion_brief
+from app.reports.pdf import build_pdf
 from app.schemas.common import APIModel
 from app.utils.serialization import jsonable
 from app.utils.time import utcnow
@@ -119,6 +121,16 @@ def summary(hours: int = Query(24, ge=1, le=24 * 30), db: Session = Depends(get_
     out = correlation_engine.summary(db, hours)
     out["stored_alerts_total"] = db.execute(select(func.count(CompositeAlert.id))).scalar() or 0
     return jsonable(out)
+
+
+@router.get("/brief")
+def brief(hours: int = Query(24, ge=1, le=24 * 30), format: str = Query("json", pattern="^(json|pdf)$"), classification: str = Query("UNCLASSIFIED", max_length=50), db: Session = Depends(get_db)):
+    """Cross-domain intelligence brief for the last N hours (JSON or PDF)."""
+    end = utcnow()
+    report, data = fusion_brief(db, end - timedelta(hours=hours), end, classification)
+    if format == "pdf":
+        return Response(build_pdf(report), media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=VELES_Intelligence_Brief_{end:%Y-%m-%d}.pdf"})
+    return jsonable(data)
 
 
 @router.get("/status")

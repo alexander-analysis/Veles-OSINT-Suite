@@ -121,6 +121,7 @@ Cargo volumes are coarse estimates (size class x 95 % x barrels/tonne, scaled by
 |--------|-----|------------|
 | OpenWeatherMap | Conditions at a vessel's position | `OPENWEATHERMAP_API_KEY` (free tier) |
 | OpenStreetMap tiles | Base map (frontend, direct from the browser) | none - attribution shown in the UI |
+| NASA GIBS WMTS (MODIS Terra true colour and thermal anomalies, previous day) | Optional satellite overlays on the vessel map - context for fires at terminals, ice, cloud cover | none (keyless WMTS, loaded by the browser) |
 
 ## Licensing
 

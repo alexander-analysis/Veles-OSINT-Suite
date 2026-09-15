@@ -133,6 +133,16 @@ def build_daily_digest() -> tuple[str, str]:
         lines.append("Evasion indicators: " + ", ".join(f"{k}: {n}" for k, n in evasion))
     lines.append("Market alerts: " + (", ".join(f"{k}: {n}" for k, n in alerts) or "none"))
     lines.append("Sanctions list changes: " + (", ".join(f"{a} {t}: {n}" for a, t, n in updates) or "none"))
+    try:
+        from app.bots.correlation import correlation_engine
+
+        with SessionLocal() as db:
+            fusion = correlation_engine.summary(db, 24)
+        lines.append(f"Fusion: {fusion['composite_alerts']} composite alert(s) ({fusion['critical_open']} critical open), {fusion['correlations']} cross-domain links.")
+        for alert in fusion.get("top_alerts", [])[:5]:
+            lines.append(f"  - [{alert['severity']}] {alert['title']} ({alert['signals']} signals, {', '.join(alert['domains'])})")
+    except Exception as exc:  # noqa: BLE001 - the digest must go out even if fusion is unavailable
+        lines.append(f"Fusion summary unavailable: {exc}")
     return f"[VELES] Daily intelligence digest {utcnow():%Y-%m-%d}", "\n".join(lines)
 
 
