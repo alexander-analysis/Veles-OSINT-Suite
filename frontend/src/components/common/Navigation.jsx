@@ -1,5 +1,6 @@
-import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, TrendingUp, Ship, ShieldAlert, Globe, Coins, Building2, Fuel, Layers, Eye, Network, ScrollText, Settings } from 'lucide-react';
+import { useState } from 'react';
+import { NavLink, useNavigate } from 'react-router-dom';
+import { LayoutDashboard, TrendingUp, Ship, ShieldAlert, Globe, Coins, Building2, Fuel, Layers, Eye, Network, ScrollText, Settings, Search } from 'lucide-react';
 import clsx from 'clsx';
 
 const LINKS = [
@@ -18,14 +19,30 @@ const LINKS = [
   { to: '/settings', label: 'Settings', icon: Settings },
 ];
 
+function SearchBox() {
+  const [q, setQ] = useState('');
+  const navigate = useNavigate();
+  const submit = (e) => {
+    e.preventDefault();
+    if (q.trim().length >= 2) navigate(`/search?q=${encodeURIComponent(q.trim())}`);
+  };
+  return (
+    <form onSubmit={submit} role="search" className="hidden md:flex items-center border border-gray-300 rounded px-2 h-8 bg-white focus-within:border-steel-500">
+      <Search size={13} className="text-gray-400" aria-hidden="true" />
+      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="name, MMSI, IMO, LEI, wallet..." aria-label="Search everything" className="w-40 xl:w-56 ml-1.5 text-xs outline-none bg-transparent" />
+    </form>
+  );
+}
+
 export default function Navigation() {
   return (
     <header className="bg-white border-b border-gray-200 no-print">
-      <div className="container mx-auto px-6 h-14 flex items-center justify-between">
+      <div className="container mx-auto px-6 h-14 flex items-center justify-between gap-3">
         <NavLink to="/" className="flex items-baseline gap-3">
           <span className="text-lg font-bold tracking-[0.2em] text-steel-700">VELES</span>
           <span className="hidden 2xl:inline text-xs text-gray-500">OSINT Intelligence Platform</span>
         </NavLink>
+        <SearchBox />
         <nav className="flex gap-0.5 overflow-x-auto" aria-label="Primary">
           {LINKS.map(({ to, label, icon: Icon, end }) => (
             <NavLink

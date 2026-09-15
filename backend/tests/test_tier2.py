@@ -301,3 +301,23 @@ def test_entity_dossier(client):
             db.query(Company).filter_by(lei="TESTDOSSIER000000001").delete()
             db.query(SanctionsEntity).filter(SanctionsEntity.source_id.in_(["t2-dossier", "t2-dossier-eu"])).delete(synchronize_session=False)
             db.commit()
+
+
+def test_global_search(client):
+    with SessionLocal() as db:
+        db.add(SanctionsEntity(designating_authority="OFAC", source_id="t2-search", name="SEARCHABLE TRADING FZE", name_normalized="SEARCHABLE TRADING FZE", entity_type="company", programs=["IRAN"], aliases=["STF DUBAI"], is_active=True, first_seen_at=utcnow(), last_updated=utcnow()))
+        db.add(Vessel(mmsi="273777555", imo="9700555", name="SEARCHABLE STAR", flag_state="GA", ship_type="Tanker"))
+        db.commit()
+    try:
+        r = client.get("/api/search?q=searchable").json()
+        assert r["total"] >= 2 and r["groups"]["vessels"][0]["href"] == "/maritime/vessel/273777555" and r["groups"]["listings"][0]["title"] == "SEARCHABLE TRADING FZE"
+        alias = client.get("/api/search?q=STF DUBAI").json()
+        assert alias["groups"]["listings"][0]["title"] == "SEARCHABLE TRADING FZE"
+        by_imo = client.get("/api/search?q=9700555").json()
+        assert by_imo["groups"]["vessels"][0]["title"].startswith("SEARCHABLE STAR")
+        assert client.get("/api/search?q=x").status_code == 422
+    finally:
+        with SessionLocal() as db:
+            db.query(SanctionsEntity).filter_by(source_id="t2-search").delete()
+            db.query(Vessel).filter_by(mmsi="273777555").delete()
+            db.commit()

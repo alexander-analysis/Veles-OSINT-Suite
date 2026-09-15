@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Plane, ShieldAlert, Megaphone, Globe2, Gavel, Anchor, RefreshCw, ExternalLink } from 'lucide-react';
@@ -245,7 +246,8 @@ function PortStateControl() {
 const TABS = [['aviation', 'Aviation', Plane], ['psc', 'Port state control', Anchor], ['leaks', 'Leaks & breaches', ShieldAlert], ['narratives', 'Narratives', Megaphone], ['infra', 'Domains & hosting', Globe2], ['legal', 'Legal & enforcement', Gavel]];
 
 export default function Monitors() {
-  const [tab, setTab] = useState('aviation');
+  const [params] = useSearchParams();
+  const [tab, setTab] = useState(TABS.some(([key]) => key === params.get('tab')) ? params.get('tab') : 'aviation');
   return (
     <div>
       <PageHeader title="Monitors" subtitle="Tier 2 / 3 collectors: sanctioned aircraft on ADS-B, port state control detentions and bans, ransomware and breach postings, state-media narratives, listed parties' web infrastructure, courts and enforcement" />

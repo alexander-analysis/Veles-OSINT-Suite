@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Building2, Search, RefreshCw, ExternalLink, GitBranch, ShieldAlert, EyeOff, Download } from 'lucide-react';
 import clsx from 'clsx';
 import PageHeader from '../components/common/PageHeader';
@@ -169,8 +170,9 @@ function LeiSearch({ onSelect, onIngested }) {
 }
 
 export default function Corporate() {
-  const [view, setView] = useState('exposure');
-  const [q, setQ] = useState('');
+  const [params0] = useSearchParams();
+  const [view, setView] = useState(params0.get('q') ? 'all' : 'exposure');
+  const [q, setQ] = useState(params0.get('q') || '');
   const [country, setCountry] = useState('');
   const [selected, setSelected] = useState(null);
   const [starting, setStarting] = useState(false);

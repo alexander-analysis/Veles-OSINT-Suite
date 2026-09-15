@@ -74,6 +74,12 @@ total notional ($1M/$5M/$20M/$100M), coordination by confidence.
 | `GET /status` | Bot status: sources, source errors (missing keys), last poll, counts, stream clients |
 | `WS /stream` | Frames: `hello`, `vessel_positions` (batched after every poll), `breach_detected`, `transshipment_detected` |
 
+## Search (`/api/search`)
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/search?q=&per_kind=8` | One query across vessels (name / MMSI / IMO / call sign / owner), active listings (name, alias, IMO, MMSI), companies (name, LEI), wallets (address, owner, label), aircraft (registration, ICAO hex, operator), domains, geopolitical events, narratives, legal events and port state control. Hits carry a `href` into the owning page. |
+
 ## Sanctions (`/api/sanctions`)
 
 | Endpoint | Purpose |

@@ -9,6 +9,15 @@ The green/blue/red bar at the top and bottom of every page is the
 classification marking (`classification.banner` in Settings). Reports carry
 the same marking.
 
+## Search
+
+The box in the header searches every domain at once - vessel names, MMSI,
+IMO, call signs and owners, sanctions listings and their aliases, companies
+and LEIs, wallet addresses and labels, aircraft registrations, domains,
+geopolitical events, narratives, legal events and port state control records.
+Each hit links to the page that owns it (vessel profile, entity dossier, the
+corporate or blockchain table pre-filtered, the right Monitors tab).
+
 ## Dashboard
 
 Live tiles: vessels tracked (with the AIS sources feeding them), open sanctions

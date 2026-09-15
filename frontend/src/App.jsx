@@ -21,6 +21,7 @@ const Fusion = lazy(() => import('./pages/Fusion'));
 const Monitors = lazy(() => import('./pages/Monitors'));
 const AuditLogPage = lazy(() => import('./pages/AuditLogPage'));
 const Settings = lazy(() => import('./pages/Settings'));
+const Search = lazy(() => import('./pages/Search'));
 
 function App() {
   const { data: config } = useFetch('/api/admin/config', 0);
@@ -49,6 +50,7 @@ function App() {
                 <Route path="/correlation" element={<Correlation />} />
                 <Route path="/audit" element={<AuditLogPage />} />
                 <Route path="/settings" element={<Settings />} />
+                <Route path="/search" element={<Search />} />
               </Routes>
             </Suspense>
           </ErrorBoundary>

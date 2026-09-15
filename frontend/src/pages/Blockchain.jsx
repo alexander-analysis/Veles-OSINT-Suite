@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Coins, RefreshCw, ExternalLink, Radio, Layers, Plus, CheckCircle2 } from 'lucide-react';
 import clsx from 'clsx';
 import PageHeader from '../components/common/PageHeader';
@@ -152,9 +153,10 @@ function AddWatch({ onAdded }) {
 }
 
 export default function Blockchain() {
+  const [params0] = useSearchParams();
   const [chain, setChain] = useState('');
-  const [walletType, setWalletType] = useState('sanctioned');
-  const [q, setQ] = useState('');
+  const [walletType, setWalletType] = useState(params0.get('q') ? '' : 'sanctioned');
+  const [q, setQ] = useState(params0.get('q') || '');
   const [sort, setSort] = useState('balance');
   const [hours, setHours] = useState(24);
   const [txFilter, setTxFilter] = useState('flagged');
