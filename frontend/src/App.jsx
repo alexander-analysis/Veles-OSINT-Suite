@@ -22,6 +22,7 @@ const Monitors = lazy(() => import('./pages/Monitors'));
 const AuditLogPage = lazy(() => import('./pages/AuditLogPage'));
 const Settings = lazy(() => import('./pages/Settings'));
 const Search = lazy(() => import('./pages/Search'));
+const Watchlist = lazy(() => import('./pages/Watchlist'));
 
 function App() {
   const { data: config } = useFetch('/api/admin/config', 0);
@@ -51,6 +52,7 @@ function App() {
                 <Route path="/audit" element={<AuditLogPage />} />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/search" element={<Search />} />
+                <Route path="/watchlist" element={<Watchlist />} />
               </Routes>
             </Suspense>
           </ErrorBoundary>

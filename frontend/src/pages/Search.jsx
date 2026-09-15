@@ -4,6 +4,7 @@ import PageHeader from '../components/common/PageHeader';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import StatusBadge from '../components/common/StatusBadge';
 import { useFetch } from '../hooks/useFetch';
+import WatchButton from '../components/common/WatchButton';
 
 const GROUPS = {
   vessels: { label: 'Vessels', icon: Ship },
@@ -18,6 +19,14 @@ const GROUPS = {
   port_state_control: { label: 'Port state control', icon: Anchor },
 };
 const AUTHORITY_TONE = { OFAC: 'error', EU: 'warn', UN: 'neutral' };
+const WATCHABLE = {
+  vessel: { kind: 'vessel', key: (h) => h.href.split('/').pop() },
+  listing: { kind: 'entity', key: (h) => String(h.id) },
+  company: { kind: 'company', key: (h) => h.title },
+  wallet: { kind: 'wallet', key: (h) => h.title },
+  aircraft: { kind: 'aircraft', key: (h) => h.title },
+  domain: { kind: 'domain', key: (h) => h.title },
+};
 
 /** One query across every domain; each hit links to the page that owns it. */
 export default function Search() {
@@ -47,6 +56,7 @@ export default function Search() {
                       {h.authority && <StatusBadge tone={AUTHORITY_TONE[h.authority]}>{h.authority}</StatusBadge>}
                       {h.status && h.status !== 'clear' && <StatusBadge tone={h.status.startsWith('breach') ? 'error' : 'warn'}>{h.status}</StatusBadge>}
                       {h.url && <a href={h.url} target="_blank" rel="noreferrer" className="text-xs text-gray-500 hover:underline">source</a>}
+                      {WATCHABLE[h.kind] && <WatchButton kind={WATCHABLE[h.kind].kind} itemKey={WATCHABLE[h.kind].key(h)} label={h.title} className="ml-auto" />}
                     </div>
                     <div className="text-xs text-gray-600">{h.subtitle}</div>
                   </li>

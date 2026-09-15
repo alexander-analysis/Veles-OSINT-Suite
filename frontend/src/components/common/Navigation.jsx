@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, TrendingUp, Ship, ShieldAlert, Globe, Coins, Building2, Fuel, Layers, Eye, Network, ScrollText, Settings, Search } from 'lucide-react';
+import { LayoutDashboard, TrendingUp, Ship, ShieldAlert, Globe, Coins, Building2, Fuel, Layers, Eye, Network, ScrollText, Settings, Search, Bookmark } from 'lucide-react';
 import clsx from 'clsx';
 
 const LINKS = [
@@ -15,6 +15,7 @@ const LINKS = [
   { to: '/fusion', label: 'Fusion', icon: Layers },
   { to: '/monitors', label: 'Monitors', icon: Eye },
   { to: '/correlation', label: 'Linkage', icon: Network },
+  { to: '/watchlist', label: 'Watchlist', icon: Bookmark },
   { to: '/audit', label: 'Audit', icon: ScrollText },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];

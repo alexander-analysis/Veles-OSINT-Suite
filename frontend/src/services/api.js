@@ -52,6 +52,7 @@ async function request(path, options = {}) {
 export const apiGet = (path, options) => request(path, options);
 export const apiPost = (path, body, options) => request(path, { method: 'POST', body: JSON.stringify(body), ...options });
 export const apiPatch = (path, body, options) => request(path, { method: 'PATCH', body: JSON.stringify(body), ...options });
+export const apiDelete = (path, options) => request(path, { method: 'DELETE', ...options });
 
 /** Download a file produced by the API (PDF/CSV/JSON) with the token attached. */
 export async function downloadFile(path, filename, options = {}) {

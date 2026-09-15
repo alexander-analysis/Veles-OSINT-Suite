@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { X } from 'lucide-react';
 import StatusBadge from '../common/StatusBadge';
 import LoadingSpinner from '../common/LoadingSpinner';
+import WatchButton from '../common/WatchButton';
 import { useFetch } from '../../hooks/useFetch';
 
 const AUTHORITY_TONE = { OFAC: 'error', EU: 'warn', UN: 'neutral' };
@@ -38,7 +39,10 @@ export default function EntityDossier({ entityId, onClose }) {
             </div>
           )}
         </div>
-        {onClose && <button type="button" onClick={onClose} className="text-gray-500 hover:text-gray-800" aria-label="close dossier"><X size={14} /></button>}
+        <span className="flex items-center gap-2">
+          {e && <WatchButton kind="entity" itemKey={String(e.id)} label={`${e.name} (${e.designating_authorities?.[0] || ''})`} />}
+          {onClose && <button type="button" onClick={onClose} className="text-gray-500 hover:text-gray-800" aria-label="close dossier"><X size={14} /></button>}
+        </span>
       </div>
       {loading && !data && <LoadingSpinner label="Compiling dossier" />}
       {error && <div className="text-sm text-red-700">{error.message}</div>}

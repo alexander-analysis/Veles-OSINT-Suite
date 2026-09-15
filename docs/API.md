@@ -176,6 +176,16 @@ total notional ($1M/$5M/$20M/$100M), coordination by confidence.
 | `GET /api/legal/events?days=&source=&event_type=&matched_only=&q=` / `GET /summary` / `POST /refresh?job=all|official|dockets` | OFAC penalties, DOJ releases, CourtListener dockets naming listed parties |
 | `GET /api/psc/events?days=&event_type=&source=&flagged_only=&matched_only=&tankers_only=&flag=&q=` / `GET /api/psc/vessel/{imo}` / `GET /summary` / `POST /refresh` | Port State Control detentions and bans (Paris MoU THETIS, Tokyo MoU APCIS) joined to tracked vessels; flagged hulls raise the vessel risk score |
 
+## Watchlist (`/api/watchlist`)
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/watchlist?include_inactive=` | Watched items with hit counts (`recent_hits` = last 7 days) and a `href` into the owning page |
+| `POST /api/watchlist` `{"kind": "vessel|entity|company|wallet|aircraft|domain|keyword", "key": "...", "label": "...", "note": "...", "alert": true}` | Watch something; vessels resolve by MMSI / IMO / exact name, listings by id or exact name; idempotent (re-adding re-activates); the first pass back-fills the last 7 days without alerting |
+| `PATCH /api/watchlist/{id}` `{"alert": false, "active": false, "note": "..."}` / `DELETE /api/watchlist/{id}` | Pause alerts, deactivate, annotate, remove (audited) |
+| `GET /api/watchlist/hits?item_id=&severity=&limit=` | Hits (evasion, sanctions matches, port calls, STS, PSC, shipments, dark oil, legal, transfers, sightings, breach postings, events, narratives, list updates), newest first |
+| `GET /api/watchlist/lookup?kind=&key=` / `GET /summary` / `POST /check` | Is it watched; counts; run the check now (202) |
+
 ## Admin (`/api/admin`)
 
 ### `GET /api/admin/config`

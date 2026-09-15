@@ -197,6 +197,12 @@ infra:
   batch: 15
   recheck_days: 14
 
+watchlist:
+  # Analyst watchlists: new records touching a watched vessel / party / company / wallet / aircraft / domain / keyword
+  enabled: true
+  interval_minutes: 10
+  alerts: true  # instant notifications (subject to the notifications section) when a watched item gets new hits
+
 psc:
   # Port State Control: Paris MoU current detentions + bans (THETIS), Tokyo MoU monthly detention list (APCIS)
   enabled: true

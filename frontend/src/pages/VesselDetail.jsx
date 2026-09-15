@@ -7,6 +7,7 @@ import StatusBadge from '../components/common/StatusBadge';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import VesselMap from '../components/maritime/VesselMap';
 import AuditLog from '../components/intelligence/AuditLog';
+import WatchButton from '../components/common/WatchButton';
 import { statusTone } from '../components/maritime/VesselTable';
 import { useFetch } from '../hooks/useFetch';
 
@@ -115,6 +116,7 @@ export default function VesselDetail() {
       <PageHeader title={`${v.name} (${v.flag_state})`} subtitle={`MMSI ${v.mmsi}${v.imo ? ` - IMO ${v.imo}` : ''}${v.call_sign ? ` - call sign ${v.call_sign}` : ''} - ${v.ship_type || 'type unknown'}`}>
         <StatusBadge tone={statusTone(v.sanctioned_status)}>{v.sanctioned_status || 'clear'}</StatusBadge>
         <StatusBadge tone={(v.risk_score || 0) >= 0.6 ? 'error' : (v.risk_score || 0) >= 0.3 ? 'warn' : 'ok'}>risk {Math.round((v.risk_score || 0) * 100)}%</StatusBadge>
+        <WatchButton kind="vessel" itemKey={v.mmsi} label={`${v.name} (${v.flag_state})`} />
         <Link to="/maritime" className="text-xs text-steel-600 flex items-center gap-1"><ArrowLeft size={12} aria-hidden="true" /> back to map</Link>
       </PageHeader>
 

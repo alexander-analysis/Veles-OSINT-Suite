@@ -287,9 +287,13 @@ def register_tier2_jobs() -> None:
     from app.bots.legal import legal_bot
     from app.bots.narratives import narrative_bot
     from app.bots.psc import psc_bot
+    from app.bots.watchlist import watchlist_bot
 
     cfg = config_store.get_config()
     boot = datetime.now(timezone.utc)
+    watch = cfg.get("watchlist", {})
+    if watch.get("enabled", True):
+        scheduler.add_job(_on_loop(watchlist_bot.check, timeout=300), "interval", minutes=int(watch.get("interval_minutes", 10)), next_run_time=boot + timedelta(seconds=300), id="watchlist.check", replace_existing=True)
     psc = cfg.get("psc", {})
     if psc.get("enabled", True):
         scheduler.add_job(_on_loop(psc_bot.fetch, timeout=600), "interval", hours=int(psc.get("interval_hours", 6)), next_run_time=boot + timedelta(seconds=840), id="psc.fetch", replace_existing=True)

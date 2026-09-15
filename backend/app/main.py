@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app import __version__
-from app.api import admin, blockchain, corporate, energy, fusion, geopolitical, health, maritime, market, sanctions, search, stream, tier2
+from app.api import admin, blockchain, corporate, energy, fusion, geopolitical, health, maritime, market, sanctions, search, stream, tier2, watchlist
 from app.auth import APITokenMiddleware
 from app.bots.scheduler import start_scheduler, stop_scheduler
 from app.config import BACKEND_DIR, settings
@@ -70,6 +70,7 @@ app.include_router(tier2.legal, prefix="/api/legal")
 app.include_router(tier2.psc, prefix="/api/psc")
 app.include_router(admin.router, prefix="/api/admin")
 app.include_router(search.router, prefix="/api/search")
+app.include_router(watchlist.router, prefix="/api/watchlist")
 
 # ---------------------------------------------------------------------------
 # Frontend hosting.  In production Nginx serves frontend/dist directly, but the

@@ -149,6 +149,21 @@ window; each carries a narrative summary and can be acknowledged. The
 "Cross-domain brief 24h (PDF)" button on the dashboard renders the same
 material as a report.
 
+## Watchlist
+
+Anything you want to be told about: a vessel (MMSI, IMO or exact name), a
+listed party, a company or LEI, a wallet address, an aircraft registration,
+a domain, or a free keyword. *Watch* buttons sit on vessel pages, entity
+dossiers and search results; the Watchlist page has a form for the rest. A
+new item is back-filled with the last seven days of matching records; after
+that the bot checks every ten minutes and every new record touching the item
+becomes a hit (evasion indicators, sanctions matches, port calls, STS
+rendezvous, port state control, oil shipments, dark-oil indicators, legal
+events, wallet transfers, aircraft sightings, breach postings, geopolitical
+events, narratives, list updates). Hits are listed newest first with a link
+to the record; with the bell on, new hits also go to the alert channels
+configured under *notifications*.
+
 ## Monitors
 
 Tier 2 / 3 collectors: sanctioned aircraft on ADS-B (map + track per airframe),
