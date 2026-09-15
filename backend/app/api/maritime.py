@@ -504,3 +504,39 @@ def get_status() -> dict[str, Any]:
     from app.bots.maritime import maritime_bot
 
     return jsonable(maritime_bot.status())
+
+
+@router.get("/vessel/{mmsi}/dossier")
+def vessel_dossier(mmsi: str, db: Session = Depends(get_db)) -> dict[str, Any]:
+    """Cross-domain context for one hull: port state control, energy shipments, dark-oil indicators, fusion links, listed owner."""
+    from app.models.correlation import SignalCorrelation
+    from app.models.energy import DarkOilIndicator, OilTankerShipment
+    from app.models.sanctions import SanctionsEntity
+    from app.models.tier2 import PscEvent
+
+    vessel = _vessel_or_404(db, mmsi)
+    psc = db.execute(select(PscEvent).where(or_(PscEvent.vessel_id == vessel.id, PscEvent.imo == vessel.imo) if vessel.imo else PscEvent.vessel_id == vessel.id).order_by(PscEvent.event_date.desc().nulls_last()).limit(30)).scalars().all()
+    shipments = db.execute(select(OilTankerShipment).where(OilTankerShipment.vessel_id == vessel.id).order_by(OilTankerShipment.loading_date.desc()).limit(30)).scalars().all()
+    dark = db.execute(select(DarkOilIndicator).where(DarkOilIndicator.tanker_id == vessel.id).order_by(DarkOilIndicator.detected_at.desc()).limit(30)).scalars().all()
+    # fusion links: any correlation whose stored summaries name this vessel (summaries carry the name / MMSI)
+    needle = f"%{vessel.name}%" if vessel.name and len(vessel.name) >= 5 else f"%{vessel.mmsi}%"
+    links = db.execute(
+        select(SignalCorrelation).where(or_(SignalCorrelation.signal_a_summary.ilike(needle), SignalCorrelation.signal_b_summary.ilike(needle), SignalCorrelation.signal_a_summary.ilike(f"%{vessel.mmsi}%"), SignalCorrelation.signal_b_summary.ilike(f"%{vessel.mmsi}%")))
+        .order_by(SignalCorrelation.confidence.desc()).limit(40)
+    ).scalars().all()
+    listed: list[dict[str, Any]] = []
+    if vessel.imo:
+        for entity in db.execute(select(SanctionsEntity).where(SanctionsEntity.imo == vessel.imo, SanctionsEntity.is_active.is_(True))).scalars():
+            listed.append({"id": entity.id, "authority": entity.designating_authority, "name": entity.name, "programs": entity.programs, "designation_date": entity.designation_date, "vessel_owner": entity.vessel_owner, "vessel_flag": entity.vessel_flag})
+    return jsonable(
+        {
+            "vessel": {"id": vessel.id, "mmsi": vessel.mmsi, "imo": vessel.imo, "name": vessel.name, "flag": vessel.flag_state, "ship_type": vessel.ship_type, "length_m": vessel.length_m, "draught": vessel.draught},
+            "listings_by_imo": listed,
+            "port_state_control": [{"id": p.id, "source": p.source, "event_type": p.event_type, "port": p.port, "port_country": p.port_country, "event_date": p.event_date, "release_date": p.release_date, "deficiency_count": p.deficiency_count,
+                                    "deficiencies": (p.deficiencies or [])[:10], "company": p.company, "class_society": p.class_society, "details": p.details} for p in psc],
+            "shipments": [{"id": s.id, "loading_location": s.loading_location, "origin_country": s.origin_country, "loading_date": s.loading_date, "discharge_location": s.discharge_location, "destination_country": s.destination_country, "discharge_date": s.discharge_date,
+                           "cargo_type": s.cargo_type, "cargo_volume_barrels": s.cargo_volume_barrels, "laden": s.laden, "sanctioned_route": s.sanctioned_route, "dark_oil_suspect": s.dark_oil_suspect, "status": s.status, "risk_score": s.risk_score} for s in shipments],
+            "dark_oil_indicators": [{"id": d.id, "pattern": d.detected_pattern, "severity": d.severity, "confidence": d.confidence_score, "summary": d.summary, "detected_at": d.detected_at, "status": d.investigation_status} for d in dark],
+            "fusion_links": [{"id": c.id, "type": c.correlation_type, "confidence": c.confidence, "a": c.signal_a_summary, "b": c.signal_b_summary, "shared_keys": c.shared_keys, "detected_at": c.detected_at} for c in links],
+        }
+    )

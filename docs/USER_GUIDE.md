@@ -53,7 +53,11 @@ high-risk vessels.
 
 **Vessel detail** - full profile, sanctions matches with evidence, linked
 vessels, evasion indicators, port calls / STS / zone events, the track with a
-replay slider, risk factors, and the vessel's audit history.
+replay slider, risk factors, and the vessel's audit history. The *cross-domain
+dossier* card pulls in what the other bots hold on the same hull: listings
+sharing its IMO (with a link to the entity dossier), port state control
+detentions and bans, oil shipments and dark-oil indicators, and fusion links
+that name the vessel.
 
 ## Sanctions
 
@@ -63,6 +67,13 @@ confidence and the authorities involved. The updates timeline shows what
 changed at each refresh (new designations, delistings, programme changes); the
 programme table shows listing and vessel counts per programme. *Refresh lists*
 re-downloads all three lists (about 20 s).
+
+**Entity dossier** - the *dossier* button on a search result (or a
+`/sanctions?entity=ID` link from a vessel page) compiles everything the
+platform has attached to that listing: the same name on other authorities'
+lists, matched vessels, companies and ownership chains, wallets with balance
+and recent transfers, domains, legal events and aircraft. An empty dossier only
+means no bot has linked a record yet.
 
 ## Market
 

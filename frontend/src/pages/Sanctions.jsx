@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { RefreshCw } from 'lucide-react';
 import PageHeader from '../components/common/PageHeader';
 import StatusBadge from '../components/common/StatusBadge';
@@ -49,6 +50,8 @@ function ProgramsTable({ programs }) {
 }
 
 export default function Sanctions() {
+  const [params] = useSearchParams();
+  const initialEntityId = params.get('entity') ? Number(params.get('entity')) : null;
   const { data: status, refetch } = useFetch('/api/sanctions/status', 15000);
   const { data: programs } = useFetch('/api/sanctions/programs', 60000);
   const [starting, setStarting] = useState(false);
@@ -95,7 +98,7 @@ export default function Sanctions() {
 
       <div className="grid gap-4 xl:grid-cols-3">
         <div className="xl:col-span-2 space-y-4">
-          <SanctionsSearchPanel />
+          <SanctionsSearchPanel key={initialEntityId || 'search'} initialEntityId={initialEntityId} />
           <SanctionsUpdatesTimeline />
         </div>
         <ProgramsTable programs={programs} />

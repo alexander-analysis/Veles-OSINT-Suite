@@ -21,9 +21,61 @@ function Field({ label, value }) {
   );
 }
 
+const fmtDate = (d) => (d ? new Date(d).toLocaleDateString() : '-');
+
+function CrossDomain({ dossier }) {
+  if (!dossier) return null;
+  const psc = dossier.port_state_control || [];
+  const shipments = dossier.shipments || [];
+  const dark = dossier.dark_oil_indicators || [];
+  const links = dossier.fusion_links || [];
+  const listed = dossier.listings_by_imo || [];
+  const empty = psc.length + shipments.length + dark.length + links.length + listed.length === 0;
+  return (
+    <div className="card mb-4">
+      <div className="card-title mb-2">Cross-domain dossier</div>
+      {empty ? <p className="text-sm text-gray-500">No port state control record, oil shipment, dark-oil indicator, listing by IMO or fusion link touches this hull.</p> : (
+        <div className="grid gap-4 xl:grid-cols-2 text-sm">
+          {listed.length > 0 && (
+            <div>
+              <div className="text-xs font-semibold text-red-700 mb-1">Listed by IMO ({listed.length})</div>
+              <ul className="space-y-1">{listed.map((e) => <li key={e.id}><StatusBadge tone={AUTHORITY_TONE[e.authority]}>{e.authority}</StatusBadge> <Link to={`/sanctions?entity=${e.id}`} className="font-medium text-steel-700 hover:underline">{e.name}</Link> <span className="text-xs text-gray-500">{(e.programs || []).join(', ')}{e.vessel_owner ? ` - owner ${e.vessel_owner}` : ''}</span></li>)}</ul>
+            </div>
+          )}
+          {psc.length > 0 && (
+            <div>
+              <div className="text-xs font-semibold text-steel-700 mb-1">Port state control ({psc.length})</div>
+              <ul className="space-y-1">{psc.map((p) => <li key={p.id}><span className="text-xs text-gray-500">{fmtDate(p.event_date)}</span> <span className={clsx('font-medium', p.event_type === 'ban' ? 'text-red-700' : '')}>{p.event_type}</span> by {p.source.replace('_', ' ')}{p.port ? ` at ${p.port}` : ''}{p.port_country ? ` (${p.port_country})` : ''}{p.deficiency_count ? ` - ${p.deficiency_count} deficiencies` : ''}{p.deficiencies?.length ? <span className="block text-xs text-gray-600">{p.deficiencies.slice(0, 4).join('; ')}</span> : null}</li>)}</ul>
+            </div>
+          )}
+          {shipments.length > 0 && (
+            <div>
+              <div className="text-xs font-semibold text-steel-700 mb-1">Oil shipments ({shipments.length})</div>
+              <ul className="space-y-1">{shipments.slice(0, 10).map((s) => <li key={s.id}><span className="text-xs text-gray-500">{fmtDate(s.loading_date)}</span> {s.loading_location || '?'} ({s.origin_country || '?'}) {'->'} {s.discharge_location || (s.status === 'underway' ? 'underway' : '?')}{s.destination_country ? ` (${s.destination_country})` : ''} - {s.cargo_type || 'cargo'}{s.cargo_volume_barrels ? ` ~${Math.round(s.cargo_volume_barrels / 1000)}k bbl` : ''}{s.sanctioned_route ? <StatusBadge tone="error">sanctioned route</StatusBadge> : null}{s.dark_oil_suspect ? <StatusBadge tone="warn">dark oil</StatusBadge> : null}</li>)}</ul>
+            </div>
+          )}
+          {dark.length > 0 && (
+            <div>
+              <div className="text-xs font-semibold text-steel-700 mb-1">Dark-oil indicators ({dark.length})</div>
+              <ul className="space-y-1">{dark.slice(0, 10).map((d) => <li key={d.id}><span className="text-xs text-gray-500">{new Date(d.detected_at).toLocaleString()}</span> <span className="font-medium">{(d.pattern || '').replace(/_/g, ' ')}</span> ({d.severity}, {Math.round((d.confidence || 0) * 100)}%) - {d.summary}</li>)}</ul>
+            </div>
+          )}
+          {links.length > 0 && (
+            <div className="xl:col-span-2">
+              <div className="text-xs font-semibold text-steel-700 mb-1">Fusion links ({links.length}) <Link to="/fusion" className="font-normal text-steel-600 hover:underline">open fusion</Link></div>
+              <ul className="space-y-1">{links.slice(0, 12).map((c) => <li key={c.id}><span className="text-xs text-gray-500">{new Date(c.detected_at).toLocaleString()}</span> <span className="font-medium">{(c.type || '').replace(/_/g, ' ')}</span> ({Math.round((c.confidence || 0) * 100)}%) - {c.a} <span className="text-gray-400">&harr;</span> {c.b}</li>)}</ul>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function VesselDetail() {
   const { mmsi } = useParams();
   const { data, loading, error } = useFetch(`/api/maritime/vessel/${mmsi}`, 60000);
+  const { data: dossier } = useFetch(`/api/maritime/vessel/${mmsi}/dossier`, 120000);
   const [frame, setFrame] = useState(null); // replay cursor (null = full track)
   const [playing, setPlaying] = useState(false);
   const timeline = data?.position_timeline || [];
@@ -156,6 +208,8 @@ export default function VesselDetail() {
           </ul>
         </div>
       </div>
+
+      <CrossDomain dossier={dossier} />
 
       <div className="card">
         <div className="card-title mb-2">Audit history</div>

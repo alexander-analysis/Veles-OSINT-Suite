@@ -285,3 +285,40 @@ def trigger_refresh(authority: str | None = Query(None, description="Comma-separ
     authorities = [a.upper() for a in _csv(authority)] or None
     bot_loop.submit(sanctions_bot.update_all_sanctions(authorities))
     return {"status": "started", "authorities": authorities or ["OFAC", "EU", "UN"]}
+
+
+@router.get("/entities/{entity_id}/dossier")
+def entity_dossier(entity_id: int, db: Session = Depends(get_db)) -> dict[str, Any]:
+    """Everything VELES holds on one listing: vessels matched to it, companies and ownership, wallets, domains, legal events, aircraft."""
+    from app.models.blockchain import BlockchainTransaction, BlockchainWallet
+    from app.models.corporate import Company, OwnershipChain
+    from app.models.tier2 import Aircraft, InfraAsset, LegalEvent
+
+    entity = db.get(SanctionsEntity, entity_id)
+    if entity is None:
+        raise HTTPException(status_code=404, detail="Entity not found")
+    breaches = db.execute(select(SanctionsBreach).where(SanctionsBreach.sanctioned_entity_id == entity.id).order_by(SanctionsBreach.match_confidence.desc()).limit(50)).scalars().all()
+    companies = db.execute(select(Company).where(Company.sanctioned_entity_id == entity.id).order_by(Company.risk_score.desc().nulls_last()).limit(50)).scalars().all()
+    chains = db.execute(select(OwnershipChain).where(OwnershipChain.subsidiary_id.in_([c.id for c in companies])).limit(20)).scalars().all() if companies else []
+    wallets = db.execute(select(BlockchainWallet).where(BlockchainWallet.owner_entity_id == entity.id).order_by(BlockchainWallet.balance_usd.desc().nulls_last())).scalars().all()
+    wallet_addresses = [w.address for w in wallets]
+    transfers = db.execute(select(BlockchainTransaction).where(or_(BlockchainTransaction.from_address.in_(wallet_addresses), BlockchainTransaction.to_address.in_(wallet_addresses))).order_by(BlockchainTransaction.timestamp.desc()).limit(30)).scalars().all() if wallet_addresses else []
+    domains = db.execute(select(InfraAsset).where(InfraAsset.entity_id == entity.id)).scalars().all()
+    legal = db.execute(select(LegalEvent).where(LegalEvent.matched_entity_id == entity.id).order_by(LegalEvent.event_date.desc().nulls_last()).limit(30)).scalars().all()
+    aircraft = db.execute(select(Aircraft).where(Aircraft.sanctioned_entity_id == entity.id)).scalars().all()
+    same_name = db.execute(select(SanctionsEntity).where(SanctionsEntity.name_normalized == entity.name_normalized, SanctionsEntity.id != entity.id, SanctionsEntity.is_active.is_(True))).scalars().all()
+    return jsonable(
+        {
+            "entity": SanctionsEntityOut.model_validate(entity).model_dump(),
+            "other_listings": [{"id": e.id, "authority": e.designating_authority, "programs": e.programs, "designation_date": e.designation_date} for e in same_name],
+            "vessels": [{"id": b.id, "vessel_id": b.vessel_id, "vessel_name": b.vessel_name, "mmsi": b.mmsi, "imo": b.imo, "flag": b.flag, "breach_type": b.breach_type, "match_confidence": b.match_confidence, "severity": b.severity, "status": b.investigation_status, "timestamp": b.timestamp} for b in breaches],
+            "companies": [{"id": c.id, "company_name": c.company_name, "lei": c.lei, "registration_country": c.registration_country, "sanctions_match_type": c.sanctions_match_type, "risk_score": c.risk_score, "is_shell_company": c.is_shell_company, "ownership_opaque": c.ownership_opaque} for c in companies],
+            "ownership_chains": [{"subsidiary_name": ch.subsidiary_name, "ultimate_owner_name": ch.ultimate_owner_name, "ultimate_owner_country": ch.ultimate_owner_country, "chain_length": ch.chain_length, "involves_sanctioned": ch.involves_sanctioned, "risk_score": ch.risk_score} for ch in chains],
+            "wallets": [{"id": w.id, "blockchain": w.blockchain, "address": w.address, "balance_usd": w.balance_usd, "transaction_count": w.transaction_count, "last_active": w.last_active} for w in wallets],
+            "wallet_balance_usd": round(sum(w.balance_usd or 0 for w in wallets), 2),
+            "transfers": [{"id": t.id, "blockchain": t.blockchain, "tx_hash": t.tx_hash, "timestamp": t.timestamp, "amount_usd": t.amount_usd, "token": t.token_type, "pattern": t.suspicious_pattern, "source_entity": t.source_entity, "destination_entity": t.destination_entity} for t in transfers],
+            "domains": [{"id": d.id, "value": d.value, "is_live": d.is_live, "hosting_country": d.hosting_country, "asn_org": d.asn_org, "registrar": d.registrar, "certificate_count": d.certificate_count, "risk_score": d.risk_score, "findings": d.findings, "last_checked": d.last_checked} for d in domains],
+            "legal_events": [{"id": e.id, "source": e.source, "title": e.title, "url": e.url, "event_date": e.event_date, "event_type": e.event_type, "court": e.court, "penalty_usd": e.penalty_usd} for e in legal],
+            "aircraft": [{"id": a.id, "registration": a.registration, "model": a.model, "operator": a.operator, "last_seen": a.last_seen, "sightings_count": a.sightings_count} for a in aircraft],
+        }
+    )

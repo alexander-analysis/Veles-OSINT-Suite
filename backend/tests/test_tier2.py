@@ -255,9 +255,49 @@ def test_psc_monitor(client, monkeypatch):
     summary = client.get("/api/psc/summary?days=365").json()
     assert summary["events"] >= 3 and summary["bans_on_record"] == 1 and summary["flagged_vessels"] == 1
     assert client.get("/api/psc/status").status_code == 200
+    dossier = client.get("/api/maritime/vessel/273777001/dossier").json()
+    assert dossier["vessel"]["imo"] == "9700001" and dossier["port_state_control"][0]["port"] == "Rijeka" and dossier["port_state_control"][0]["event_type"] == "detention"
+    assert isinstance(dossier["shipments"], list) and isinstance(dossier["fusion_links"], list) and dossier["listings_by_imo"] == []
+    assert client.get("/api/maritime/vessel/000000000/dossier").status_code == 404
     with SessionLocal() as db:
         db.query(PscEvent).delete()
         vessel = db.query(Vessel).filter_by(imo="9700001").first()
         if vessel:
             vessel.sanctioned_status, vessel.risk_score = "clear", 0.0
         db.commit()
+
+
+def test_entity_dossier(client):
+    from app.models.blockchain import BlockchainTransaction, BlockchainWallet
+
+    with SessionLocal() as db:
+        entity = SanctionsEntity(designating_authority="OFAC", source_id="t2-dossier", name="TEST DOSSIER HOLDINGS LLC", name_normalized="TEST DOSSIER HOLDINGS LLC", entity_type="company", programs=["RUSSIA-EO14024"], is_active=True, first_seen_at=utcnow(), last_updated=utcnow())
+        db.add(entity)
+        db.flush()
+        db.add(SanctionsEntity(designating_authority="EU", source_id="t2-dossier-eu", name="TEST DOSSIER HOLDINGS LLC", name_normalized="TEST DOSSIER HOLDINGS LLC", entity_type="company", programs=["UKR"], is_active=True, first_seen_at=utcnow(), last_updated=utcnow()))
+        db.add(Company(company_name="TEST DOSSIER HOLDINGS LLC", lei="TESTDOSSIER000000001", registration_country="AE", sanctioned_entity_id=entity.id, sanctions_match_type="direct", risk_score=0.9, source="gleif", source_ref="t2"))
+        db.add(BlockchainWallet(blockchain="tron", address="TDossierTestWallet00000000000000001", owner_entity_id=entity.id, balance_usd=1500.5, transaction_count=3, sanctioning_authority="OFAC", owner_name=entity.name, is_sanctioned=True))
+        db.add(BlockchainTransaction(blockchain="tron", tx_hash="dossier-tx-1", timestamp=utcnow(), from_address="TDossierTestWallet00000000000000001", to_address="TSomewhereElse", amount_usd=1200.0, token_type="USDT", suspicious_pattern="sanctioned_counterparty"))
+        db.add(LegalEvent(source="doj", source_id="t2-dossier-legal", title="Test Dossier Holdings indicted", matched_entity_id=entity.id, event_type="indictment", event_date=utcnow()))
+        db.add(InfraAsset(asset_type="domain", value="dossier-test.example", entity_id=entity.id, is_live=True, risk_score=0.7))
+        db.add(Aircraft(registration="T7-DOS", sanctioned_entity_id=entity.id, model="Gulfstream", operator="Test Dossier Holdings"))
+        db.commit()
+        entity_id = entity.id
+    try:
+        d = client.get(f"/api/sanctions/entities/{entity_id}/dossier").json()
+        assert d["entity"]["name"] == "TEST DOSSIER HOLDINGS LLC" and d["other_listings"][0]["authority"] == "EU"
+        assert d["companies"][0]["lei"] == "TESTDOSSIER000000001" and d["wallets"][0]["blockchain"] == "tron" and d["wallet_balance_usd"] == 1500.5
+        assert d["transfers"][0]["tx_hash"] == "dossier-tx-1" and d["transfers"][0]["timestamp"].endswith("Z")
+        assert d["legal_events"][0]["event_type"] == "indictment" and d["domains"][0]["value"] == "dossier-test.example" and d["aircraft"][0]["registration"] == "T7-DOS"
+        assert d["vessels"] == [] and d["ownership_chains"] == []
+        assert client.get("/api/sanctions/entities/999999999/dossier").status_code == 404
+    finally:
+        with SessionLocal() as db:
+            db.query(BlockchainTransaction).filter_by(tx_hash="dossier-tx-1").delete()
+            db.query(BlockchainWallet).filter_by(address="TDossierTestWallet00000000000000001").delete()
+            db.query(Aircraft).filter_by(registration="T7-DOS").delete()
+            db.query(InfraAsset).filter_by(value="dossier-test.example").delete()
+            db.query(LegalEvent).filter_by(source_id="t2-dossier-legal").delete()
+            db.query(Company).filter_by(lei="TESTDOSSIER000000001").delete()
+            db.query(SanctionsEntity).filter(SanctionsEntity.source_id.in_(["t2-dossier", "t2-dossier-eu"])).delete(synchronize_session=False)
+            db.commit()

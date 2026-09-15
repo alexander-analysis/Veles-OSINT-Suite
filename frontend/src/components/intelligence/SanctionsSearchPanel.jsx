@@ -3,13 +3,15 @@ import { Search, ShieldAlert } from 'lucide-react';
 import { apiGet, apiPost } from '../../services/api';
 import LoadingSpinner from '../common/LoadingSpinner';
 import StatusBadge from '../common/StatusBadge';
+import EntityDossier from './EntityDossier';
 
 const AUTHORITY_TONE = { OFAC: 'error', EU: 'warn', UN: 'neutral' };
 const TYPES = ['any', 'vessel', 'company', 'person', 'aircraft'];
 
 /** Search the consolidated lists and run an explicit (audited) screening check. */
-export default function SanctionsSearchPanel() {
+export default function SanctionsSearchPanel({ initialEntityId = null }) {
   const [query, setQuery] = useState('');
+  const [dossierId, setDossierId] = useState(initialEntityId);
   const [type, setType] = useState('any');
   const [authority, setAuthority] = useState('');
   const [results, setResults] = useState(null);
@@ -68,6 +70,7 @@ export default function SanctionsSearchPanel() {
       </form>
       {loading && <LoadingSpinner label="Searching lists" />}
       {error && <div className="text-sm text-red-700">{error}</div>}
+      {dossierId && <div className="mb-3"><EntityDossier entityId={dossierId} onClose={() => setDossierId(null)} /></div>}
 
       {check && (
         <div className={`border rounded-md p-3 mb-3 text-sm ${check.is_sanctioned ? 'border-red bg-red-50' : 'border-green bg-green-50'}`}>
@@ -110,6 +113,7 @@ export default function SanctionsSearchPanel() {
                       </StatusBadge>
                     ))}
                     <StatusBadge>{e.entity_type}</StatusBadge>
+                    <button type="button" onClick={() => setDossierId(e.id)} className="px-2 py-0.5 rounded border border-gray-300 bg-white text-xs hover:bg-gray-100">dossier</button>
                   </span>
                 </div>
                 <div className="mt-1 text-xs text-gray-600 grid gap-x-4 gap-y-0.5 sm:grid-cols-2">
