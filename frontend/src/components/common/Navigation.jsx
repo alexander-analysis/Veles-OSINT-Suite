@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, TrendingUp, Ship, ShieldAlert, Globe, Coins, Building2, Fuel, Network, ScrollText, Settings } from 'lucide-react';
+import { LayoutDashboard, TrendingUp, Ship, ShieldAlert, Globe, Coins, Building2, Fuel, Layers, Network, ScrollText, Settings } from 'lucide-react';
 import clsx from 'clsx';
 
 const LINKS = [
@@ -11,6 +11,7 @@ const LINKS = [
   { to: '/blockchain', label: 'Blockchain', icon: Coins },
   { to: '/corporate', label: 'Corporate', icon: Building2 },
   { to: '/energy', label: 'Energy', icon: Fuel },
+  { to: '/fusion', label: 'Fusion', icon: Layers },
   { to: '/correlation', label: 'Linkage', icon: Network },
   { to: '/audit', label: 'Audit', icon: ScrollText },
   { to: '/settings', label: 'Settings', icon: Settings },

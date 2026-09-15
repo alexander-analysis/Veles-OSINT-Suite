@@ -17,6 +17,7 @@ const Geopolitical = lazy(() => import('./pages/Geopolitical'));
 const Blockchain = lazy(() => import('./pages/Blockchain'));
 const Corporate = lazy(() => import('./pages/Corporate'));
 const Energy = lazy(() => import('./pages/Energy'));
+const Fusion = lazy(() => import('./pages/Fusion'));
 const AuditLogPage = lazy(() => import('./pages/AuditLogPage'));
 const Settings = lazy(() => import('./pages/Settings'));
 
@@ -42,6 +43,7 @@ function App() {
                 <Route path="/blockchain" element={<Blockchain />} />
                 <Route path="/corporate" element={<Corporate />} />
                 <Route path="/energy" element={<Energy />} />
+                <Route path="/fusion" element={<Fusion />} />
                 <Route path="/correlation" element={<Correlation />} />
                 <Route path="/audit" element={<AuditLogPage />} />
                 <Route path="/settings" element={<Settings />} />

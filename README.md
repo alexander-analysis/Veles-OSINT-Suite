@@ -7,7 +7,7 @@ OFAC, EU and UN sanctions lists, with evasion detection and an immutable audit
 trail). Runs 24/7 on a Raspberry Pi 5 and is reachable remotely through a
 Cloudflare Tunnel.
 
-**Status: v1.1 - core platform complete; ecosystem tier 1 bots live (geopolitical monitor, blockchain tracker, corporate intelligence, energy flow monitor).**
+**Status: v1.1 - core platform complete; ecosystem tier 1 complete (geopolitical monitor, blockchain tracker, corporate intelligence, energy flow monitor, fusion engine).**
 
 | Module | What it does |
 |--------|--------------|
@@ -18,6 +18,7 @@ Cloudflare Tunnel.
 | Blockchain tracker | Every OFAC digital-currency address (Bitcoin, Ethereum, Tron and more) watched through keyless public APIs: balances and token holdings, new transfers scored for exchange cash-outs, mixer use and sanctioned counterparties, a live Bitcoin mempool whale / sanctioned-address feed, Ethereum stablecoin flow capture and common-input clustering |
 | Corporate intelligence | Every listed company and vessel owner resolved through GLEIF in rotation: LEI records, direct / ultimate parents, subsidiaries; unlisted companies under or above a listed party surface as sanctions exposure; shell and opacity indicators (secrecy jurisdictions, undisclosed parents, lapsed registrations, fresh formations); live LEI search with import-and-walk |
 | Energy flow monitor | ~60 curated terminals, refineries, LNG plants and STS anchorages watched through AIS: tanker calls with draught changes become shipments (origin, destination, estimated barrels), dark-oil indicators (loading at sanctioned facilities, AIS gaps and spoofing after loading, STS transfers, anchorage loitering, identity changes) and daily flow snapshots correlated with Brent / WTI |
+| Intelligence fusion | Every bot output becomes a typed signal (vessels, listed parties, wallets, companies, facilities, countries, assets); cross-domain pairs are scored and clusters spanning three or more domains become composite alerts with a narrative - plus a unified severity-ranked queue and a per-domain timeline |
 | Compliance | Append-only audit log (enforced in the ORM and the database), classification markings, PDF/JSON/CSV intelligence reports, optional API token, webhook / e-mail alerts and a daily digest |
 
 Docs: [ARCHITECTURE](docs/ARCHITECTURE.md) - [API](docs/API.md) - [DEPLOYMENT](docs/DEPLOYMENT.md) - [DATA_SOURCES](docs/DATA_SOURCES.md) - [USER_GUIDE](docs/USER_GUIDE.md) - [DEVELOPMENT](docs/DEVELOPMENT.md) - [SECURITY](docs/SECURITY.md) - [LICENSES](docs/LICENSES.md)

@@ -80,4 +80,5 @@ Nginx (static frontend + /api proxy + WebSocket)  <--  Cloudflare Tunnel  <--  a
 | 5 (ecosystem tier 1) | Blockchain tracker (OFAC wallets on BTC / ETH / TRON, cash-out and mixer detection, whale feed, co-spend clusters) | done |
 | 5 (ecosystem tier 1) | Corporate intelligence (GLEIF ownership walk, sanctions exposure, shell indicators, live LEI search) | done |
 | 5 (ecosystem tier 1) | Energy flow monitor (facility watch, shipment reconstruction, dark-oil indicators, price context) | done |
-| 5 (ecosystem tier 1) | Cross-bot correlation engine (composite alerts) | in progress |
+| 5 (ecosystem tier 1) | Cross-bot correlation engine: typed signal registry, strong-key clustering, composite alerts, unified queue | done |
+| 6 (ecosystem tier 2 / 3) | Aviation, port authority, leaks, disinformation, domain / IP, legal, satellite bots | next |

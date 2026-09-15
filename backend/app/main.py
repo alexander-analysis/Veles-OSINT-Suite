@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app import __version__
-from app.api import admin, blockchain, corporate, energy, geopolitical, health, maritime, market, sanctions, stream
+from app.api import admin, blockchain, corporate, energy, fusion, geopolitical, health, maritime, market, sanctions, stream
 from app.auth import APITokenMiddleware
 from app.bots.scheduler import start_scheduler, stop_scheduler
 from app.config import BACKEND_DIR, settings
@@ -61,6 +61,7 @@ app.include_router(geopolitical.router, prefix="/api/geopolitical")
 app.include_router(blockchain.router, prefix="/api/blockchain")
 app.include_router(corporate.router, prefix="/api/corporate")
 app.include_router(energy.router, prefix="/api/energy")
+app.include_router(fusion.router, prefix="/api/fusion")
 app.include_router(admin.router, prefix="/api/admin")
 
 # ---------------------------------------------------------------------------

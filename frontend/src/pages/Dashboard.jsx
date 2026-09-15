@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { TrendingUp, Ship, Activity, Database, Clock, ShieldAlert, FileDown, AlertTriangle, Globe, Coins, Building2, Fuel } from 'lucide-react';
+import { TrendingUp, Ship, Activity, Database, Clock, ShieldAlert, FileDown, AlertTriangle, Globe, Coins, Building2, Fuel, Layers } from 'lucide-react';
 import PageHeader from '../components/common/PageHeader';
 import StatusBadge from '../components/common/StatusBadge';
 import LoadingSpinner from '../components/common/LoadingSpinner';
@@ -50,6 +50,7 @@ export default function Dashboard() {
   const { data: chain } = useFetch('/api/blockchain/summary?hours=24', 60000);
   const { data: corp } = useFetch('/api/corporate/summary', 120000);
   const { data: energy } = useFetch('/api/energy/summary?days=7', 120000);
+  const { data: fusion } = useFetch('/api/fusion/summary?hours=48', 60000);
   const market = health?.bots?.market;
   const maritime = health?.bots?.maritime;
   const sanctions = health?.bots?.sanctions;
@@ -72,7 +73,22 @@ export default function Dashboard() {
         </div>
       )}
 
+      {fusion?.top_alerts?.length ? (
+        <div className="card mb-4 border-red">
+          <div className="card-title mb-2 flex items-center gap-1 text-red-700"><Layers size={12} aria-hidden="true" /> Composite alerts - multiple domains lit up together</div>
+          <ul className="space-y-1 text-sm">
+            {fusion.top_alerts.map((a) => (
+              <li key={a.id} className="flex flex-wrap items-center gap-2">
+                <StatusBadge tone={a.severity === 'critical' || a.severity === 'high' ? 'error' : 'warn'}>{a.severity}</StatusBadge>
+                <Link to="/fusion" className="font-medium text-steel-700 hover:underline">{a.title}</Link>
+                <span className="text-xs text-gray-500">{a.signals} signals - {a.domains.join(', ')} - {Math.round((a.confidence || 0) * 100)}% - {new Date(a.detected_at).toLocaleString()}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6 mb-4">
+        <Tile icon={Layers} title="Fusion (48h)" value={fusion ? fusion.open_composite_alerts : '-'} detail={fusion ? `${fusion.critical_open} critical composite - ${fusion.correlations} cross-domain links` : undefined} tone={fusion ? (fusion.critical_open ? 'error' : fusion.open_composite_alerts ? 'warn' : 'ok') : undefined} to="/fusion" />
         <Tile icon={Fuel} title="Sanctioned oil shipments (7d)" value={energy ? energy.sanctioned_shipments : '-'} detail={energy ? `${Object.values(energy.dark_oil_indicators || {}).reduce((s, n) => s + n, 0)} dark-oil indicators - ${energy.tankers_at_facilities_now} tankers at watched facilities` : undefined} tone={energy ? (Object.values(energy.dark_oil_indicators || {}).reduce((s, n) => s + n, 0) ? 'warn' : 'ok') : undefined} to="/energy" />
         <Tile icon={Building2} title="Corporate exposure" value={corp ? corp.exposure : '-'} detail={corp ? `${corp.companies.toLocaleString()} companies - ${corp.with_lei} resolved - ${corp.shell_companies} shell indicators` : undefined} tone={corp ? (corp.exposure ? 'warn' : 'ok') : undefined} to="/corporate" />
         <Tile icon={Coins} title="Sanctioned crypto wallets" value={chain ? chain.sanctioned_wallets_total : '-'} detail={chain ? `$${Math.round(chain.sanctioned_balance_usd || 0).toLocaleString()} held - ${chain.sanctioned_wallets_active} active 24h` : undefined} tone={chain ? (chain.sanctioned_wallets_active ? 'error' : 'ok') : undefined} to="/blockchain" />

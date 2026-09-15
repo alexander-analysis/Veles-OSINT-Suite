@@ -143,6 +143,16 @@ energy:
   snapshot_interval_minutes: 60
   snapshot_days: 35
 
+correlation:
+  # Cross-bot correlation engine: signals from every bot inside the window are matched on shared
+  # vessels / listed parties / wallets / companies / facilities / countries / assets; clusters spanning
+  # min_domains bot domains become composite alerts.
+  enabled: true
+  interval_minutes: 5
+  window_hours: 48
+  min_pair_score: 0.45
+  min_domains: 3
+
 retention:
   market_candles_days: 90
   blockchain_transactions_days: 90

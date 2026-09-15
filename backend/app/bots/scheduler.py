@@ -268,6 +268,17 @@ def register_energy_jobs() -> None:
                       id="energy.snapshot_flows", replace_existing=True)
 
 
+def register_correlation_jobs() -> None:
+    from app.bots.correlation import correlation_engine
+
+    cfg = config_store.get_config().get("correlation", {})
+    if not cfg.get("enabled", True):
+        log.info("correlation engine disabled in settings")
+        return
+    scheduler.add_job(_on_loop(correlation_engine.run, timeout=300), "interval", minutes=int(cfg.get("interval_minutes", 5)),
+                      next_run_time=datetime.now(timezone.utc) + timedelta(seconds=420), id="fusion.correlate", replace_existing=True)
+
+
 def register_notification_jobs() -> None:
     from app import notifications
 
@@ -288,6 +299,7 @@ def start_scheduler() -> BackgroundScheduler:
     register_blockchain_jobs()
     register_corporate_jobs()
     register_energy_jobs()
+    register_correlation_jobs()
     register_notification_jobs()
     scheduler.start()
     log.info("started with {} job(s)", len(scheduler.get_jobs()))

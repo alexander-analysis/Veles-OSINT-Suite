@@ -142,6 +142,18 @@ total notional ($1M/$5M/$20M/$100M), coordination by confidence.
 | `GET /summary?days=` | Counters, indicator mix, most active facilities, origin -> destination countries |
 | `GET /status` / `POST /refresh?job=all|facilities|visits|shipments|dark_oil|snapshots` | Bot status; run a job now (202) |
 
+## Fusion (`/api/fusion`)
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /queue?hours=&min_severity=&domains=&limit=` | Every signal from every bot in one ranked list (severity, correlation count, recency) with its typed keys |
+| `GET /composite-alerts?hours=&acknowledged=&min_severity=` / `GET /composite-alerts/{id}` | Clusters of correlated signals spanning >= 3 bot domains, with a narrative summary |
+| `POST /composite-alerts/{id}/acknowledge?analyst=&notes=` | Acknowledge (audited) |
+| `GET /correlations?hours=&correlation_type=&signal_type=&min_confidence=` | Pairwise cross-domain correlations (shared vessel / listed party / wallet / company / facility / country / asset) |
+| `GET /timeline?hours=&bucket_hours=` | Signal counts per bucket per domain |
+| `GET /summary?hours=` | Open / critical composite alerts, correlation counts by type, top alerts |
+| `GET /status` / `POST /refresh` | Engine status; run a correlation pass now (202) |
+
 ## Admin (`/api/admin`)
 
 ### `GET /api/admin/config`
