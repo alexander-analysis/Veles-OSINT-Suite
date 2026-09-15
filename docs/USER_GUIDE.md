@@ -100,6 +100,6 @@ backend requires one. AIS source toggles take effect after a restart.
 |-----------|---------|
 | 0.95 | IMO / MMSI identity match - treat as the designated vessel |
 | 0.8-0.9 | Exact name match with agreeing/unknown flag |
-| 0.6-0.7 | Owner/operator match, fuzzy name with agreeing flag, comprehensive-programme flag |
-| 0.4-0.55 | Review queue: name-only with a different flag, beneficial-owner links |
+| 0.6-0.7 | Owner/operator match, fuzzy name with agreeing flag |
+| 0.4-0.55 | Review queue: name-only with a different flag, comprehensive-programme flag (IR/KP/SY/CU), beneficial-owner links |
 | < 0.4 | Not shown (a differing IMO number rules a name match out) |

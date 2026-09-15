@@ -8,7 +8,7 @@ Confidence ladder (brief section 17):
 * ... capped at 0.30 when both IMO numbers are known and differ (namesake)
 * Owner / operator matches a listed company (+0.05 flag)   0.60  owner_match
 * Beneficial owner matches a listed entity                 0.40  owner_match (review queue)
-* Flag state under a comprehensive programme (IR/KP/SY/CU) 0.80  flag_violation
+* Flag state under a comprehensive programme (IR/KP/SY/CU) 0.55  flag_violation (review tier)
 """
 
 import re
@@ -233,7 +233,7 @@ class SanctionsIndex:
                     entity=None,
                     match_type="flag_program",
                     matched_value=flag,
-                    confidence=0.8,
+                    confidence=0.55,  # review tier: an indicator about the flag, not the vessel's identity
                     breach_type="flag_violation",
                     authority="OFAC",
                     summary=f"Flag state {flag} falls under the comprehensive {program} sanctions programme",
