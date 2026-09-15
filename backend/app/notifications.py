@@ -1,8 +1,8 @@
-"""Alert delivery: Slack-compatible webhook and SMTP e-mail (instant alerts + daily digest).
+"""Alert delivery: Slack-compatible webhook, Telegram bot and SMTP e-mail (instant alerts + daily digest).
 
 Configuration: ``notifications`` section in ``settings.yaml`` (enabled,
 minimum severity, recipients, digest hour) and credentials in ``.env``
-(``NOTIFY_WEBHOOK_URL``, ``SMTP_*``).  Delivery is fire-and-forget from the
+(``NOTIFY_WEBHOOK_URL``, ``TELEGRAM_BOT_TOKEN`` + ``TELEGRAM_CHAT_ID``, ``SMTP_*``).  Delivery is fire-and-forget from the
 bot loop and never raises into the caller - a broken mail server must not
 stop detection.
 """
@@ -33,7 +33,20 @@ def enabled_channels() -> dict[str, bool]:
     return {
         "webhook": bool(cfg.get("enabled") and cfg.get("webhook_enabled", True) and settings.key("NOTIFY_WEBHOOK_URL")),
         "email": bool(cfg.get("enabled") and cfg.get("email_enabled", True) and settings.key("SMTP_HOST") and cfg.get("email_to")),
+        "telegram": bool(cfg.get("enabled") and cfg.get("telegram_enabled", True) and settings.key("TELEGRAM_BOT_TOKEN") and settings.key("TELEGRAM_CHAT_ID")),
     }
+
+
+async def _send_telegram(subject: str, text: str, data: dict[str, Any] | None) -> None:
+    """Bot API sendMessage; plain text (no parse mode) so summaries with '<', '_' or '*' never break delivery."""
+    token, chat_id = settings.key("TELEGRAM_BOT_TOKEN"), settings.key("TELEGRAM_CHAT_ID")
+    lines = [subject, text]
+    if data:
+        lines.extend(f"{k}: {v}" for k, v in data.items() if v is not None)
+    body = "\n".join(lines)
+    async with httpx.AsyncClient(timeout=15) as client:
+        response = await client.post(f"https://api.telegram.org/bot{token}/sendMessage", json={"chat_id": chat_id, "text": body[:4000], "disable_web_page_preview": True})
+        response.raise_for_status()
 
 
 async def _post_webhook(text: str, data: dict[str, Any] | None) -> None:
@@ -75,6 +88,13 @@ async def deliver(subject: str, text: str, data: dict[str, Any] | None = None) -
         except Exception as exc:  # noqa: BLE001
             outcome["webhook"] = f"failed: {exc}"
             log.warning("webhook delivery failed: {}", exc)
+    if channels["telegram"]:
+        try:
+            await _send_telegram(subject, text, data)
+            outcome["telegram"] = "sent"
+        except Exception as exc:  # noqa: BLE001
+            outcome["telegram"] = f"failed: {exc}"
+            log.warning("telegram delivery failed: {}", exc)
     if channels["email"]:
         try:
             await asyncio.to_thread(_send_email, subject, text + ("\n\n" + "\n".join(f"{k}: {v}" for k, v in (data or {}).items()) if data else ""), list(_config().get("email_to", [])))

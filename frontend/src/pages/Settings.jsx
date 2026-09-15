@@ -22,7 +22,7 @@ const SECTION_HELP = {
   legal: 'Enforcement / DOJ polling and CourtListener docket search batch.',
   psc: 'Port state control sources (Paris MoU THETIS, Tokyo MoU APCIS) and cadence.',
   watchlist: 'Watchlist check cadence and whether hits fire instant alerts.',
-  notifications: 'Instant alerts and the daily digest (channels need NOTIFY_WEBHOOK_URL / SMTP_* in .env).',
+  notifications: 'Instant alerts and the daily digest (channels need NOTIFY_WEBHOOK_URL, TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID or SMTP_* in .env).',
   retention: 'How long raw data is kept before purge/thinning (audit log is never purged).',
   classification: 'Marking shown on every page and on generated reports.',
 };

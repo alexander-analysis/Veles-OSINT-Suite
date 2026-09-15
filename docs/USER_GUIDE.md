@@ -212,6 +212,15 @@ Edit thresholds, cadences, notification options and the classification marking
 (saved to `settings.local.yaml`, audited). Paste the API token here if the
 backend requires one. AIS source toggles take effect after a restart.
 
+**Alert channels** activate from `.env`: a Slack-compatible webhook
+(`NOTIFY_WEBHOOK_URL`), a Telegram bot (`TELEGRAM_BOT_TOKEN` from @BotFather
+plus your `TELEGRAM_CHAT_ID` - message the bot once, then read the id from
+`https://api.telegram.org/bot<TOKEN>/getUpdates`), and SMTP e-mail
+(`SMTP_*` with `email_to` in the notifications section). Set
+`notifications.enabled: true` and `min_severity`; watchlist hits, composite
+alerts, sanctioned-wallet activity and critical events then arrive instantly,
+and a daily digest at `digest_hour_utc`.
+
 ## Confidence and severity at a glance
 
 | Confidence | Meaning |

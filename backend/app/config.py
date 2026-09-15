@@ -64,6 +64,8 @@ class Settings(BaseSettings):
 
     # Notifications (see app/notifications.py)
     NOTIFY_WEBHOOK_URL: str = ""
+    TELEGRAM_BOT_TOKEN: str = ""
+    TELEGRAM_CHAT_ID: str = ""
     SMTP_HOST: str = ""
     SMTP_PORT: int = 587
     SMTP_USER: str = ""

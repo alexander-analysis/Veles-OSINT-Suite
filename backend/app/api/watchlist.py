@@ -103,10 +103,12 @@ def list_items(include_inactive: bool = False, db: Session = Depends(get_db)) ->
     items = db.execute(query.order_by(WatchlistItem.last_hit_at.desc().nulls_last(), WatchlistItem.created_at.desc())).scalars().all()
     week = utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
     recent = dict(db.execute(select(WatchlistHit.item_id, func.count()).where(WatchlistHit.created_at >= week.fromordinal(week.toordinal() - 7)).group_by(WatchlistHit.item_id)).all())
+    totals = dict(db.execute(select(WatchlistHit.item_id, func.count()).group_by(WatchlistHit.item_id)).all())  # live count: hits can be purged with their records
     out = []
     for item in items:
         row = WatchlistItemOut.model_validate(item)
         row.recent_hits = recent.get(item.id, 0)
+        row.hit_count = totals.get(item.id, 0)
         row.href = _href(item)
         out.append(row)
     return out

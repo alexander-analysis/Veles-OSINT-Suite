@@ -41,7 +41,7 @@ def test_api_token_protection(client, monkeypatch):
 
 def test_notifications_disabled_is_noop_and_digest_builds(client):
     notifications.send_alert("breach", "t", "x", "critical")  # disabled in settings.yaml -> no exception, no channels
-    assert notifications.enabled_channels() == {"webhook": False, "email": False}
+    assert notifications.enabled_channels() == {"webhook": False, "email": False, "telegram": False}
     assert asyncio.run(notifications.deliver("subject", "body")) == {}
     subject, body = notifications.build_daily_digest()
     assert subject.startswith("[VELES] Daily intelligence digest") and "Maritime:" in body

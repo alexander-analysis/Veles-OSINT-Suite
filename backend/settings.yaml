@@ -239,11 +239,12 @@ retention:
   purge_hour_utc: 2
 
 notifications:
-  # Instant alerts (webhook / e-mail) for events at or above min_severity, plus a daily digest.
-  # Channels activate when NOTIFY_WEBHOOK_URL / SMTP_* are present in .env.
+  # Instant alerts (webhook / Telegram / e-mail) for events at or above min_severity, plus a daily digest.
+  # Channels activate when NOTIFY_WEBHOOK_URL / TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID / SMTP_* are present in .env.
   enabled: false
   min_severity: high
   webhook_enabled: true
+  telegram_enabled: true
   email_enabled: true
   email_to: []
   digest_enabled: true

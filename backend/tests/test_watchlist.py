@@ -80,3 +80,37 @@ def test_watchlist_items_and_hits(client, monkeypatch):
     assert client.delete(f"/api/watchlist/{item_id}").status_code == 204
     assert client.get("/api/watchlist/lookup?kind=vessel&key=273777888").json()["watched"] is False
     assert client.get("/api/maritime/audit-log?action_type=watchlist_removed").json()["total"] >= 1
+
+
+def test_telegram_channel(monkeypatch):
+    """The Telegram channel activates from .env and posts plain text to the Bot API."""
+    import asyncio
+
+    import httpx
+
+    from app import notifications
+    from app.config import settings
+
+    calls = []
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc):
+            return False
+
+        async def post(self, url, json=None):
+            calls.append((url, json))
+            return httpx.Response(200, request=httpx.Request("POST", url))
+
+    monkeypatch.setattr(httpx, "AsyncClient", FakeClient)
+    monkeypatch.setattr(settings, "TELEGRAM_BOT_TOKEN", "123:abc")
+    monkeypatch.setattr(settings, "TELEGRAM_CHAT_ID", "42")
+    monkeypatch.setattr(notifications, "_config", lambda: {"enabled": True, "min_severity": "high", "webhook_enabled": False, "email_enabled": False})
+    assert notifications.enabled_channels() == {"webhook": False, "email": False, "telegram": True}
+    outcome = asyncio.run(notifications.deliver("[VELES HIGH] Watchlist: PERLE", "one hit <b> & *stars*", {"kind": "vessel"}))
+    assert outcome == {"telegram": "sent"} and calls[0][0].endswith("/bot123:abc/sendMessage") and calls[0][1]["chat_id"] == "42" and "kind: vessel" in calls[0][1]["text"]
