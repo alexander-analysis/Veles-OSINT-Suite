@@ -45,6 +45,9 @@ Environment=PYTHONUNBUFFERED=1
 ExecStart=$APP_DIR/backend/venv/bin/python run.py
 Restart=always
 RestartSec=10
+# a runaway process is restarted instead of taking the Pi down (cgroup v2 user slice)
+MemoryMax=2200M
+MemoryHigh=1900M
 TimeoutStopSec=30
 StandardOutput=append:$APP_DIR/logs/veles.out
 StandardError=append:$APP_DIR/logs/veles.out

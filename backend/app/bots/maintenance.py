@@ -1,6 +1,9 @@
 """Retention for the ecosystem tables (the audit log is never purged)."""
 
 import asyncio
+import ctypes
+import gc
+import platform
 from datetime import timedelta
 from typing import Any
 
@@ -66,6 +69,19 @@ async def checkpoint() -> dict[str, int] | None:
     return result
 
 
+async def trim_memory() -> dict[str, int]:
+    """Collect garbage and hand freed heap back to the OS (glibc keeps it otherwise - RSS crept to 1 GB on the Pi)."""
+    collected = gc.collect()
+    trimmed = 0
+    if platform.system() == "Linux":
+        try:
+            trimmed = int(ctypes.CDLL("libc.so.6").malloc_trim(0))
+        except (OSError, AttributeError):
+            trimmed = 0
+    return {"collected": collected, "trimmed": trimmed}
+
+
 def register(scheduler, on_loop, purge_hour: int) -> Any:
-    scheduler.add_job(on_loop(checkpoint, timeout=600), "interval", minutes=30, id="maintenance.checkpoint", replace_existing=True)
+    scheduler.add_job(on_loop(checkpoint, timeout=600), "interval", minutes=10, id="maintenance.checkpoint", replace_existing=True)
+    scheduler.add_job(on_loop(trim_memory, timeout=60), "interval", minutes=15, id="maintenance.trim_memory", replace_existing=True)
     return scheduler.add_job(on_loop(purge_ecosystem_tables, timeout=900), "cron", hour=purge_hour, minute=55, id="maintenance.purge", replace_existing=True)

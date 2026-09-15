@@ -15,6 +15,7 @@ Jobs (scheduled in ``app.bots.scheduler``, run on the bot event loop):
 """
 
 import asyncio
+import threading
 import time
 from collections import defaultdict
 from datetime import datetime, timedelta
@@ -62,6 +63,7 @@ class MaritimeBot:
         self.last_index_seen: datetime | None = None
         self.touched: set[int] = set()  # vessel ids changed since the last risk-score pass
         self._ingest_lock = asyncio.Lock()
+        self._ingest_thread_lock = threading.Lock()  # the worker thread outlives a cancelled coroutine
         self._last_history: dict[str, datetime] = {}  # mmsi -> timestamp of the last stored history fix
 
     # ------------------------------------------------------------------ config
@@ -161,6 +163,15 @@ class MaritimeBot:
         return counts
 
     def _ingest(self, positions: list[AISPosition], cfg: dict[str, Any]) -> dict[str, int]:
+        if not self._ingest_thread_lock.acquire(blocking=False):
+            log.warning("AIS ingest skipped - a previous ingest thread is still writing")
+            return {"skipped": 1}
+        try:
+            return self._ingest_locked(positions, cfg)
+        finally:
+            self._ingest_thread_lock.release()
+
+    def _ingest_locked(self, positions: list[AISPosition], cfg: dict[str, Any]) -> dict[str, int]:
         """Upsert vessels/positions and run the per-report detectors."""
         gap_hours = float(cfg.get("ais_gap_threshold_hours", 6))
         history_interval = timedelta(minutes=float(cfg.get("history_interval_minutes", 60)))
@@ -481,20 +492,39 @@ class MaritimeBot:
         return await asyncio.to_thread(self._check_sanctions_sync, hours)
 
     def _check_sanctions_sync(self, hours: int = 24) -> int:
-        """Re-screen vessels active in the last ``hours`` (all vessels after a list refresh)."""
+        """Re-screen vessels active since the last pass (every vessel after a list refresh), in bounded chunks.
+
+        The ingest already screens new hulls and identity changes; this is the safety net that catches new
+        designations.  A global feed has ~50k vessels, so the work is chunked per session to cap memory and
+        keep each write transaction short.
+        """
         index = sanctions_bot.index
         if index is None:
             log.info("sanctions index not ready - skipping vessel screening")
             return 0
         full = self.last_index_seen is None or index.built_at > self.last_index_seen
-        with SessionLocal() as db:
-            stmt = select(Vessel) if full else select(Vessel).where(Vessel.last_ais_update >= utcnow() - timedelta(hours=hours))
-            vessels = db.execute(stmt).scalars().all()
-            created = sum(self._screen_vessel(db, vessel) for vessel in vessels)
-            db.commit()
+        since = self.last_sanctions_check_at or (utcnow() - timedelta(hours=hours))
+        created = checked = 0
+        last_id = 0
+        chunk = 2000
+        while True:
+            with SessionLocal() as db:
+                stmt = select(Vessel).where(Vessel.id > last_id).order_by(Vessel.id).limit(chunk)
+                if not full:
+                    stmt = stmt.where(Vessel.last_ais_update >= since - timedelta(minutes=5))
+                vessels = db.execute(stmt).scalars().all()
+                if not vessels:
+                    break
+                created += sum(self._screen_vessel(db, vessel) for vessel in vessels)
+                checked += len(vessels)
+                last_id = vessels[-1].id
+                db.commit()
+            if len(vessels) < chunk:
+                break
+            time.sleep(0.2)  # let other writers in between chunks
         self.last_index_seen = index.built_at
         self.last_sanctions_check_at = utcnow()
-        log.info("Sanctions screening: {} vessel(s) checked ({}), {} new breach(es)", len(vessels), "full" if full else f"last {hours}h", created)
+        log.info("Sanctions screening: {} vessel(s) checked ({}), {} new breach(es)", checked, "full" if full else f"since {since:%H:%M}", created)
         return created
 
     # ----------------------------------------------------------- transshipment
@@ -509,8 +539,9 @@ class MaritimeBot:
         now = utcnow()
         created = 0
         with SessionLocal() as db:
-            recent = db.execute(select(Vessel).where(Vessel.last_ais_update >= now - timedelta(minutes=30), Vessel.current_position_lat.isnot(None))).scalars().all()
-            pairs = sts.find_proximity_pairs(recent, proximity, float(cfg.get("transshipment_max_speed_knots", 1.5)))
+            max_speed = float(cfg.get("transshipment_max_speed_knots", 1.5))
+            recent = db.execute(select(Vessel).where(Vessel.last_ais_update >= now - timedelta(minutes=30), Vessel.current_position_lat.isnot(None), Vessel.current_speed <= max_speed)).scalars().all()
+            pairs = sts.find_proximity_pairs(recent, proximity, max_speed)
             window = timedelta(hours=8)
             for a, b, distance in pairs:
                 history_a = db.execute(select(VesselPosition).where(VesselPosition.vessel_id == a.id, VesselPosition.timestamp >= now - window)).scalars().all()
