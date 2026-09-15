@@ -242,7 +242,12 @@ class BlockchainBot:
                 result["bitcoin"] += 1
             except Exception as exc:  # noqa: BLE001
                 result["errors"] += 1
-                log.warning("bitcoin poll failed for {}: {}", wallet["address"], exc)
+                if getattr(getattr(exc, "response", None), "status_code", None) == 400:
+                    # the listing carries a malformed address (OFAC typos happen) - stop asking for it every cycle
+                    await asyncio.to_thread(self._unwatch, wallet["id"], "invalid address rejected by the explorer")
+                    log.warning("bitcoin address {} is invalid - unwatched", wallet["address"])
+                else:
+                    log.warning("bitcoin poll failed for {}: {}", wallet["address"], exc)
             await asyncio.sleep(0.5)
         for wallet in due.get("tron", []):
             try:
@@ -262,6 +267,16 @@ class BlockchainBot:
     def _load_labels_standalone(self) -> None:
         with SessionLocal() as db:
             self._load_labels(db)
+
+    @staticmethod
+    def _unwatch(wallet_id: int, reason: str) -> None:
+        with SessionLocal() as db:
+            row = db.get(BlockchainWallet, wallet_id)
+            if row is not None:
+                row.watch = False
+                row.last_checked = utcnow()
+                row.risk_factors = [*(row.risk_factors or []), f"unwatched: {reason}"]
+                db.commit()
 
     @staticmethod
     def _due_wallets(batch_btc: int, batch_trx: int) -> dict[str, list[dict[str, Any]]]:
