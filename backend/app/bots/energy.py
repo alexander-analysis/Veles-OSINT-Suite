@@ -178,6 +178,7 @@ class EnergyBot:
     def _build_shipments(self) -> dict[str, int]:
         now = utcnow()
         created = discharged = 0
+        new_shipments: list[OilTankerShipment] = []
         with SessionLocal() as db:
             self._ensure_ids(db)
             facilities = {f.id: f for f in db.execute(select(EnergyFacility)).scalars()}
@@ -209,11 +210,13 @@ class EnergyBot:
                     created_at=now, updated_at=now,
                 )
                 db.add(shipment)
+                new_shipments.append(shipment)
                 known_calls.add(call.id)
                 created += 1
-            db.flush()
-            # close open shipments with the next call of the same vessel
-            for shipment in db.execute(select(OilTankerShipment).where(OilTankerShipment.status == "underway")).scalars():
+            # close open shipments with the next call of the same vessel (pending inserts are not flushed until commit,
+            # so the write lock is only taken once at the end - the new rows are visited from memory)
+            underway = list(db.execute(select(OilTankerShipment).where(OilTankerShipment.status == "underway")).scalars()) + new_shipments
+            for shipment in underway:
                 next_call = db.execute(
                     select(PortCallEvent).where(PortCallEvent.vessel_id == shipment.vessel_id, PortCallEvent.arrival_time > shipment.loading_date + timedelta(hours=6))
                     .order_by(PortCallEvent.arrival_time).limit(1)

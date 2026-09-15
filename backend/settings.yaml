@@ -51,6 +51,9 @@ maritime:
   # slow vessels with a slow neighbour within ~1 km (possible rendezvous) keep a fix every N minutes
   history_slow_interval_minutes: 10
   history_risk_floor: 0.3
+  # AIS ingest writes in chunks of N vessels per transaction with a short pause so other bots get the SQLite lock
+  ingest_chunk_size: 600
+  ingest_chunk_pause_seconds: 0.15
   transshipment_max_speed_knots: 1.5
   # Confidence thresholds (brief section 17)
   min_visible_confidence: 0.6

@@ -15,6 +15,7 @@ Jobs (scheduled in ``app.bots.scheduler``, run on the bot event loop):
 """
 
 import asyncio
+import time
 from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import Any
@@ -179,9 +180,14 @@ class MaritimeBot:
         # transaction would starve the other bots' writers on a Pi ("database is locked").
         chunk_size = int(cfg.get("ingest_chunk_size", 600))
         items = list(latest.items())
+        pause = float(cfg.get("ingest_chunk_pause_seconds", 0.15))
         for start in range(0, len(items), chunk_size):
             chunk = dict(items[start : start + chunk_size])
             self._ingest_chunk(chunk, cfg, rendezvous_candidates, gap_hours, history_interval, slow_interval, risk_floor, stats, updates)
+            if pause and start + chunk_size < len(items):
+                # SQLite's busy handler polls with sleeps; without a gap between chunks a waiting writer never
+                # wins the lock back from this loop and times out ("database is locked")
+                time.sleep(pause)
         if updates:
             stream.publish("vessel_positions", {"count": len(updates), "vessels": updates[:2000]})
         return dict(stats)
