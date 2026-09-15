@@ -63,7 +63,7 @@ export default function Dashboard() {
 
   return (
     <div>
-      <PageHeader title="Intelligence Dashboard" subtitle="Live status across market, sanctions and maritime collection">
+      <PageHeader title="Intelligence Dashboard" subtitle="Live status across market, sanctions, maritime, geopolitical, blockchain, corporate, energy and monitor collection - fused">
         {updatedAt && <span className="text-xs text-gray-500">Refreshed {updatedAt.toLocaleTimeString()}</span>}
       </PageHeader>
 

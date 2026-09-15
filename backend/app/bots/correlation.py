@@ -137,11 +137,20 @@ def collect_signals(db: Session, since: datetime, limit_per_type: int = 400) -> 
         s.add("sector", "finance")
         signals.append(s)
 
+    # vessels already in play (breaches, evasion, STS, port calls) whose names are distinctive enough to spot in a headline
+    vessel_names: dict[str, str] = {}
+    mmsis = sorted({m for sig in signals for m in sig.keys.get("vessel", ())})
+    for i in range(0, len(mmsis), 500):
+        for mmsi, name in db.execute(select(Vessel.mmsi, Vessel.name).where(Vessel.mmsi.in_(mmsis[i:i + 500]))).all():
+            if name and (len(name) >= 8 or " " in name.strip()) and not name.upper().startswith(("UNKNOWN", "TANKER", "VESSEL")):
+                vessel_names[name.upper()] = mmsi
     for g in db.execute(select(GeopoliticalEvent).where(GeopoliticalEvent.event_date >= since, GeopoliticalEvent.severity.in_(["medium", "high", "critical"])).limit(limit_per_type)).scalars():
         s = Signal("geopolitical_event", g.id, g.event_date, g.title, g.severity or "medium")
         s.add("country", g.country_primary, g.country_secondary, *(g.affected_countries or []))
         s.add("sector", *(g.affected_sectors or []))
         s.add("facility", *facilities_in_text(g.title))
+        title_upper = f" {g.title.upper()} "
+        s.add("vessel", *(mmsi for name, mmsi in vessel_names.items() if f" {name} " in title_upper))
         if g.event_type == "sanctions":
             s.add("theme", "sanctions")
         if g.event_type in ("maritime_incident", "port_closure"):
