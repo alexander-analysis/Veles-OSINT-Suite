@@ -175,6 +175,19 @@ class MaritimeBot:
         }
         stats = defaultdict(int)
         updates: list[dict] = []
+        # Short transactions: a global poll is thousands of vessels, and one long write
+        # transaction would starve the other bots' writers on a Pi ("database is locked").
+        chunk_size = int(cfg.get("ingest_chunk_size", 600))
+        items = list(latest.items())
+        for start in range(0, len(items), chunk_size):
+            chunk = dict(items[start : start + chunk_size])
+            self._ingest_chunk(chunk, cfg, rendezvous_candidates, gap_hours, history_interval, slow_interval, risk_floor, stats, updates)
+        if updates:
+            stream.publish("vessel_positions", {"count": len(updates), "vessels": updates[:2000]})
+        return dict(stats)
+
+    def _ingest_chunk(self, latest: dict[str, AISPosition], cfg: dict[str, Any], rendezvous_candidates: set[str], gap_hours: float,
+                      history_interval: timedelta, slow_interval: timedelta, risk_floor: float, stats: dict, updates: list[dict]) -> None:
         lane_checks: list[tuple[Vessel, AISPosition]] = []
         breaches_found = 0
         with SessionLocal() as db:
@@ -272,11 +285,8 @@ class MaritimeBot:
             for vessel, position in lane_checks:
                 self._lane_events(db, vessel, position, stats)
             db.commit()
-            stats["positions"] = len(new_rows)
-            stats["breaches"] = breaches_found
-        if updates:
-            stream.publish("vessel_positions", {"count": len(updates), "vessels": updates[:2000]})
-        return dict(stats)
+            stats["positions"] += len(new_rows)
+            stats["breaches"] += breaches_found
 
     def _claim_imo(self, db: Session, vessel: Vessel, position: AISPosition, imo_owner: dict[str, Vessel], stats: dict) -> bool:
         """Give ``vessel`` the reported IMO unless another MMSI holds it.

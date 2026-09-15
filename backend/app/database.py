@@ -38,7 +38,8 @@ DATABASE_PATH: Path | None = (
     else None
 )
 
-connect_args = {"timeout": 15, "check_same_thread": False} if IS_SQLITE else {}
+# 60 s busy timeout: several bots write from different threads and a big AIS batch can hold the lock for a while
+connect_args = {"timeout": 60, "check_same_thread": False} if IS_SQLITE else {}
 engine = create_engine(DATABASE_URL, connect_args=connect_args, pool_pre_ping=True)
 
 
