@@ -30,8 +30,9 @@ audit log, and one-click PDF reports (maritime 7 d, sanctions 7 d, market 7 d).
 **Map** - every vessel heard in the last 6 hours. Green = clear, orange =
 flagged (low-confidence match, in the review queue), red = breach. Red `!`
 markers are breach locations. Layers (top-right control): OFAC / EU / UN
-monitoring zones, war and piracy zones, shipping lanes and chokepoints, ports,
-and *GNSS interference (48h)* - dashed red circles where several hulls
+monitoring zones, war and piracy zones, *STS hubs* (documented ship-to-ship
+transfer areas - a rendezvous inside one scores higher), shipping lanes and
+chokepoints, ports, and *GNSS interference (48h)* - dashed red circles where several hulls
 reported implausible positions together (spoofing / jamming clusters).
 Click a vessel for its popup and *View details*.
 

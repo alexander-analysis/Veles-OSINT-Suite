@@ -45,7 +45,10 @@ fewer than half the known listings never delists anything.
   (Russian export terminals, Iranian, DPRK, Syrian, Cuban, Venezuelan and
   occupied-Ukraine ports marked as sanctioned facilities).
 * `backend/app/data/zones.py` - monitoring zones (sanctions / war / piracy)
-  tagged with the applicable authorities, and shipping lanes / chokepoints.
+  tagged with the applicable authorities, shipping lanes / chokepoints, and
+  STS-hub zones derived from the `sts_hub` entries of the energy facility list
+  (Ceuta, Laconian Gulf, Kalamata, Augusta, Skagen, Kola Bay, Kavkaz, Fujairah,
+  Sohar, EOPL, Nipah, Linggi, Koh Si Chang, Zhoushan, East China Sea, Kozmino, Lome).
 * `backend/app/data/mid.py` - ITU Maritime Identification Digits -> flag state.
 * `backend/app/data/countries.py` - country names used by OFAC/UN -> ISO codes.
 * `backend/app/data/ne_50m_land.json.gz` - Natural Earth 1:50m land polygons

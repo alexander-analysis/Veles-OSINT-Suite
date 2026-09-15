@@ -10,6 +10,7 @@ const AUTHORITY_STYLE = {
   eu: { color: '#3498db', fillColor: '#3498db', fillOpacity: 0.06, weight: 1.5 },
   un: { color: '#f1c40f', fillColor: '#f1c40f', fillOpacity: 0.08, weight: 1.5 },
   other: { color: '#7f8c8d', fillColor: '#7f8c8d', fillOpacity: 0.05, weight: 1, dashArray: '4 4' },
+  sts: { color: '#8e44ad', fillColor: '#8e44ad', fillOpacity: 0.08, weight: 1.5, dashArray: '2 4' },
 };
 
 const ring = (feature) => feature.geometry.coordinates[0].map(([lon, lat]) => [lat, lon]);
@@ -140,6 +141,9 @@ export default function VesselMap({ vessels, breaches, selectedTrack, height = '
           </LayersControl.Overlay>
           <LayersControl.Overlay name="War / piracy zones">
             <LayerGroup>{zones?.other && <ZoneLayer features={zones.other.features} styleKey="other" />}</LayerGroup>
+          </LayersControl.Overlay>
+          <LayersControl.Overlay checked name="STS hubs">
+            <LayerGroup>{zones?.sts_hubs && <ZoneLayer features={zones.sts_hubs.features} styleKey="sts" />}</LayerGroup>
           </LayersControl.Overlay>
           <LayersControl.Overlay checked name="Shipping lanes / chokepoints">
             <LayerGroup>

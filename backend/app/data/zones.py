@@ -4,11 +4,15 @@ Polygons are deliberately coarse (bounding shapes of the relevant sea areas):
 they drive *alerts for analyst review*, not legal geofences.  Coordinates are
 ``[lon, lat]`` rings.
 
-Zone ``kind``: ``sanctions_zone`` (tagged with the authorities whose
+Zone ``kind``: ``sts_hub`` (known ship-to-ship transfer areas),
+``sanctions_zone`` (tagged with the authorities whose
 restrictive measures apply), ``war_zone``, ``piracy_zone``.
 Lane ``choke_point``: True for narrow passages where transit monitoring is
 most valuable.
 """
+
+
+import math
 
 
 def _box(lon_min: float, lat_min: float, lon_max: float, lat_max: float) -> list[list[float]]:
@@ -66,6 +70,26 @@ LANES: list[dict] = [
     {"name": "Taiwan Strait", "choke_point": True, "ring": _box(117.5, 23.0, 121.0, 26.0)},
     {"name": "Cape of Good Hope route", "choke_point": False, "ring": _box(17.0, -36.0, 21.0, -33.5)},
 ]
+
+
+def _circle_box(lat: float, lon: float, radius_km: float) -> list[list[float]]:
+    dlat = radius_km / 111.0
+    dlon = radius_km / (111.0 * max(0.2, math.cos(math.radians(lat))))
+    return _box(lon - dlon, lat - dlat, lon + dlon, lat + dlat)
+
+
+def _sts_hub_zones() -> list[dict]:
+    """Known ship-to-ship hubs, derived from the energy facility list so both subsystems share one source of truth."""
+    from app.data.energy_facilities import FACILITIES
+
+    return [
+        {"name": f["name"], "kind": "sts_hub", "authorities": [f["authority"]] if f.get("authority") else [], "context": f.get("note") or "Documented ship-to-ship transfer area",
+         "ring": _circle_box(f["lat"], f["lon"], float(f.get("radius_km") or 15))}
+        for f in FACILITIES if f.get("type") == "sts_hub"
+    ]
+
+
+ZONES.extend(_sts_hub_zones())
 
 
 def zones_geojson() -> dict:

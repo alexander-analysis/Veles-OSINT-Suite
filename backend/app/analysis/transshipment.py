@@ -140,8 +140,11 @@ def assess_candidate(a, b, distance_m: float, duration_minutes: int, started_at:
         confidence += 0.15
     if neighbours >= cluster_limit:
         confidence -= 0.1  # a crowded anchorage is a weaker signal than two ships alone at sea
-    zones = [z.name for z in zones_containing(lat, lon)]
-    if zones:
+    areas = zones_containing(lat, lon)
+    zones = [z.name for z in areas]
+    if any(z.kind == "sts_hub" for z in areas):
+        confidence += 0.2  # a rendezvous inside a documented STS hub
+    elif zones:
         confidence += 0.1
     risky = [v for v in (a, b) if (v.sanctioned_status or "clear") != "clear" or (v.risk_score or 0) >= 0.5]
     if risky:

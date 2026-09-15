@@ -402,9 +402,12 @@ def get_shipping_lanes() -> dict[str, Any]:
 def get_sanctions_zones() -> dict[str, Any]:
     """Zones grouped by authority (a zone can appear under several) plus war/piracy zones."""
     geojson = zones_geojson()
-    grouped: dict[str, list] = {"ofac": [], "eu": [], "un": [], "other": []}
+    grouped: dict[str, list] = {"ofac": [], "eu": [], "un": [], "other": [], "sts_hubs": []}
     for feature in geojson["features"]:
         authorities = [a.lower() for a in feature["properties"]["authorities"]]
+        if feature["properties"]["kind"] == "sts_hub":
+            grouped["sts_hubs"].append(feature)
+            continue
         if not authorities:
             grouped["other"].append(feature)
         for authority in authorities:
