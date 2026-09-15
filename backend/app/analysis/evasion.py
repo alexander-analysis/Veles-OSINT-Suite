@@ -4,6 +4,7 @@ All functions are pure: they take the stored vessel state plus the incoming
 report and return ``EvasionIndicator`` records for the bot to persist.
 """
 
+import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -133,10 +134,31 @@ def detect_position_anomaly(previous_time: datetime | None, previous_lat: float 
     )
 
 
+def name_token(value: str | None) -> str:
+    """Letters and digits only, upper-case, roman numerals and 'NO.' spellings folded - 'LOCA LOLA 2' == 'LOCA LOLA II'."""
+    text = re.sub(r"[^A-Z0-9 ]", " ", (value or "").upper())
+    text = re.sub(r"\bNO\.? ?(\d)", r"NO\1", text)
+    words = [ROMAN.get(w, w) for w in text.split()]
+    return "".join(words)
+
+
+ROMAN = {"I": "1", "II": "2", "III": "3", "IV": "4", "V": "5", "VI": "6", "VII": "7", "VIII": "8", "IX": "9", "X": "10", "XI": "11", "XII": "12"}
+
+
+def is_name_variant(old: str | None, new: str | None) -> bool:
+    return name_token(old) == name_token(new)
+
+
 def detect_identity_changes(vessel, position) -> list[EvasionIndicator]:
-    """Name / flag changes on the same MMSI, and IMO reported under a new name."""
+    """Name / flag changes on the same MMSI, and IMO reported under a new name.
+
+    Cosmetic variants (padding, punctuation, 'NO.2' vs 'NO2', roman numerals) and a flip back to a name the hull carried
+    within its recent history (two sources spelling it differently) are not renames.
+    """
     indicators = []
-    if position.name and vessel.name and position.name.upper() != vessel.name.upper() and not vessel.name.startswith("MMSI "):
+    recent = {name_token(n) for n in (getattr(vessel, "historical_names", None) or [])[-3:]}
+    if (position.name and vessel.name and position.name.upper() != vessel.name.upper() and not vessel.name.startswith("MMSI ")
+            and not is_name_variant(vessel.name, position.name) and name_token(position.name) not in recent):
         indicators.append(
             EvasionIndicator(
                 event_type="name_change",

@@ -68,5 +68,30 @@ class AISPosition:
             self.speed = None
         if self.flag is None:
             self.flag = flag_from_mmsi(self.mmsi)
-        if self.imo in ("0", 0, ""):
-            self.imo = None
+        self.imo = valid_imo(self.imo)
+        self.name = clean_name(self.name)
+        self.destination = clean_name(self.destination) if self.destination else self.destination
+
+
+IMO_PLACEHOLDERS = {"1234567"}  # passes the check digit by coincidence, typed into thousands of transponders
+
+
+def valid_imo(value) -> str | None:
+    """Seven digits with a correct check digit, else None - placeholders (0, 1, 1234567, 999999999) are shared by
+    hundreds of transponders and would otherwise glue unrelated hulls together."""
+    if value is None:
+        return None
+    digits = str(value).strip().upper().removeprefix("IMO").strip()
+    if len(digits) != 7 or not digits.isdigit() or len(set(digits)) == 1 or digits in IMO_PLACEHOLDERS:
+        return None
+    if sum(int(d) * w for d, w in zip(digits[:6], (7, 6, 5, 4, 3, 2))) % 10 != int(digits[6]):
+        return None
+    return digits
+
+
+def clean_name(value) -> str | None:
+    """AIS 6-bit text padding ('@') and stray whitespace stripped; empty -> None."""
+    if value is None:
+        return None
+    text = " ".join(str(value).replace("@", " ").split()).strip(" -_.")
+    return text or None

@@ -53,6 +53,14 @@ they are rolled up into one *GNSS spoofing cluster* event (high when 5+ hulls
 or the spot is on land, critical at 10+) listing every vessel caught in it -
 the signature of a jammer or spoofer rather than one bad transponder.
 
+Noise rules: a hull raises at most one position anomaly per
+`anomaly_cooldown_hours` (repeats are counted on the open event, `[x12 in
+6 h]`); IMO numbers that fail the check digit or are placeholders
+(`1`, `999999999`, `1234567`) are ignored, so they cannot glue unrelated
+hulls together; the same two transponders arguing over one IMO produce one
+identity conflict per day; and cosmetic name variants (`@` padding, `NO.2`
+vs `NO2`, roman numerals, a flip back to a recent spelling) are not renames.
+
 **Transshipment** - pairs of slow cargo vessels within the proximity threshold,
 away from ports, for at least the configured duration; confidence rises with
 duration, tanker involvement, zone context and the vessels' own risk. Marina

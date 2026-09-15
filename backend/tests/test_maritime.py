@@ -138,9 +138,9 @@ def test_ingest_screens_and_detects(client, maritime_setup):
     # batch 1 (90 min ago): the designated hull (renamed), two loitering tankers, a namesake, a soon-to-be-renamed vessel
     batch1 = [
         _pos("620000001", *PRIMORSK, 90, name="STAR OF THE SEA", imo="9182253", flag="GA", speed=0.0, ship_type="Tanker"),
-        _pos("273000101", *OPEN_SEA, 90, name="TANKER ONE", speed=0.3, ship_type="Tanker", imo="9000001"),
-        _pos("273000102", OPEN_SEA[0] + 0.002, OPEN_SEA[1], 90, name="TANKER TWO", speed=0.5, ship_type="Tanker", imo="9000002"),
-        _pos("230000201", 60.15, 24.95, 90, name="VICTORIA", imo="9000003", flag="FI", speed=0.0),
+        _pos("273000101", *OPEN_SEA, 90, name="TANKER ONE", speed=0.3, ship_type="Tanker", imo="9000003"),
+        _pos("273000102", OPEN_SEA[0] + 0.002, OPEN_SEA[1], 90, name="TANKER TWO", speed=0.5, ship_type="Tanker", imo="9000015"),
+        _pos("230000201", 60.15, 24.95, 90, name="VICTORIA", imo="9000027", flag="FI", speed=0.0),
         _pos("273000301", 59.80, 26.00, 600, name="OLD NAME", flag="RU", speed=12.0, ship_type="Cargo"),
     ]
     stats = bot._ingest(batch1, cfg)
@@ -265,10 +265,10 @@ def test_imo_reconciliation_clears_namesake(client, maritime_setup):
     stats = bot._ingest([_pos("626000777", 5.5, -1.0, 5, name="SHADOW STAR", flag="GA", speed=8.0, ship_type="Tanker")], cfg)
     assert stats["breaches"] == 1  # exact name, flag agrees -> 0.9
     assert client.get("/api/maritime/vessels/table?q=626000777").json()["vessels"][0]["sanctioned_status"] == "breach_ofac"
-    stats = bot._ingest([_pos("626000777", 5.6, -1.1, 0, name="SHADOW STAR", flag="GA", speed=8.0, ship_type="Tanker", imo="2222222")], cfg)
+    stats = bot._ingest([_pos("626000777", 5.6, -1.1, 0, name="SHADOW STAR", flag="GA", speed=8.0, ship_type="Tanker", imo="2222224")], cfg)
     assert stats["breaches_auto_cleared"] == 1
     vessel = client.get("/api/maritime/vessels/table?q=626000777").json()["vessels"][0]
-    assert vessel["sanctioned_status"] == "clear" and vessel["imo"] == "2222222"
+    assert vessel["sanctioned_status"] == "clear" and vessel["imo"] == "2222224"
     cleared = client.get("/api/maritime/audit-log?action_type=cleared&user=system").json()
     assert cleared["total"] >= 1 and "namesake" in cleared["entries"][0]["rationale"]
 
@@ -278,12 +278,12 @@ def test_imo_claims_never_violate_uniqueness(client, maritime_setup):
     bot = maritime_setup
     cfg = bot.config()
     stats = bot._ingest([
-        _pos("636099001", 10.0, 10.0, 1, name="HOLDER", imo="9555555", speed=5.0),
-        _pos("636099002", 10.1, 10.1, 0, name="CLAIMANT", imo="9555555", speed=5.0),
+        _pos("636099001", 10.0, 10.0, 1, name="HOLDER", imo="9555553", speed=5.0),
+        _pos("636099002", 10.1, 10.1, 0, name="CLAIMANT", imo="9555553", speed=5.0),
     ], cfg)
     assert stats["new_vessels"] == 2 and stats["identity_conflicts"] == 1
     table = {v["mmsi"]: v for v in client.get("/api/maritime/vessels/table?q=6360990").json()["vessels"]}
-    assert table["636099001"]["imo"] == "9555555" and table["636099002"]["imo"] is None
+    assert table["636099001"]["imo"] == "9555553" and table["636099002"]["imo"] is None
     # the holder goes silent for two days; a new MMSI reports the hull -> identity transfers with history
     from app.database import SessionLocal
     from app.models.maritime import Vessel
@@ -291,10 +291,10 @@ def test_imo_claims_never_violate_uniqueness(client, maritime_setup):
         holder = db.execute(__import__("sqlalchemy").select(Vessel).where(Vessel.mmsi == "636099001")).scalar_one()
         holder.last_ais_update = utcnow() - timedelta(days=2)
         db.commit()
-    stats = bot._ingest([_pos("636099003", 10.2, 10.2, 0, name="REBORN", imo="9555555", speed=5.0)], cfg)
+    stats = bot._ingest([_pos("636099003", 10.2, 10.2, 0, name="REBORN", imo="9555553", speed=5.0)], cfg)
     assert stats["identity_transfers"] == 1
     table = {v["mmsi"]: v for v in client.get("/api/maritime/vessels/table?q=6360990&max_age_hours=100").json()["vessels"]}
-    assert table["636099003"]["imo"] == "9555555" and table["636099001"]["imo"] is None
+    assert table["636099003"]["imo"] == "9555553" and table["636099001"]["imo"] is None
     profile = client.get("/api/maritime/vessel/636099003").json()
     assert "HOLDER" in profile["vessel"]["historical_names"]
 
@@ -333,3 +333,38 @@ def test_spoofing_cluster_detection(client, maritime_setup):
     assert listing["by_type"]["spoofing_cluster"] >= 1 and any(r["details"]["vessel_count"] == 4 for r in listing["events"])
     # analysis helper on its own: two hulls are not a cluster
     assert evasion.spoofing_clusters([], min_vessels=3) == []
+
+
+def test_ais_noise_rules(client, maritime_setup):
+    """Placeholder IMOs are dropped, '@' padding stripped, cosmetic renames and source flip-flops ignored, anomalies rate-limited."""
+    from app.database import SessionLocal
+    from app.integrations.ais_common import clean_name, valid_imo
+    from app.models.maritime import EvasionEvent, Vessel
+
+    assert valid_imo("9182253") == "9182253" and valid_imo("IMO 9182253") == "9182253"
+    assert valid_imo("9999999") is None and valid_imo("1") is None and valid_imo("1234567") is None and valid_imo("9182254") is None
+    assert clean_name("FURUNOP@@@@") == "FURUNOP" and clean_name("  LOCA  LOLA 2 ") == "LOCA LOLA 2" and clean_name("@@@") is None
+    assert evasion.is_name_variant("LOCA LOLA 2", "LOCA LOLA II") and evasion.is_name_variant("YONG AN NO.2", "YONG AN NO2") and not evasion.is_name_variant("CEDERBORG", "DEEP NORDIC")
+
+    bot = maritime_setup
+    cfg = bot.config()
+    bot._ingest([_pos("273555001", 60.0, 26.0, 30, name="FURUNOP@", imo="999999999", speed=5.0, ship_type="Cargo")], cfg)
+    stats = bot._ingest([_pos("273555001", 60.01, 26.01, 25, name="FURUNOP", imo="1", speed=5.0, ship_type="Cargo")], cfg)
+    assert stats.get("name_change", 0) == 0
+    stats = bot._ingest([_pos("273555001", 60.02, 26.02, 20, name="FURUNOP II", speed=5.0, ship_type="Cargo")], cfg)
+    assert stats.get("name_change", 0) == 1  # a real rename
+    stats = bot._ingest([_pos("273555001", 60.03, 26.03, 15, name="FURUNOP", speed=5.0, ship_type="Cargo")], cfg)
+    assert stats.get("name_change", 0) == 0  # flipping back to a recent name is a source disagreement, not a rename
+    with SessionLocal() as db:
+        vessel = db.query(Vessel).filter_by(mmsi="273555001").one()
+        assert vessel.imo is None and vessel.name == "FURUNOP II"
+    # three impossible jumps inside the cooldown -> one anomaly event with a repeat counter
+    for i, minutes in enumerate((12, 8, 4)):
+        bot._ingest([_pos("273555001", 10.0 + i, 100.0, minutes, name="FURUNOP II", speed=5.0, ship_type="Cargo")], cfg)
+    with SessionLocal() as db:
+        vessel = db.query(Vessel).filter_by(mmsi="273555001").one()
+        anomalies = db.query(EvasionEvent).filter_by(vessel_id=vessel.id, event_type="position_anomaly").all()
+        assert len(anomalies) == 1 and anomalies[0].details["repeats"] == 3 and "[x3" in anomalies[0].summary
+        db.query(EvasionEvent).filter_by(vessel_id=vessel.id).delete()
+        db.delete(vessel)
+        db.commit()

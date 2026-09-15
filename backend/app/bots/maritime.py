@@ -218,6 +218,7 @@ class MaritimeBot:
                       history_interval: timedelta, slow_interval: timedelta, risk_floor: float, stats: dict, updates: list[dict]) -> None:
         lane_checks: list[tuple[Vessel, AISPosition]] = []
         breaches_found = 0
+        anomaly_cooldown = timedelta(hours=float(cfg.get("anomaly_cooldown_hours", 6)))
         with SessionLocal() as db:
             mmsis = list(latest)
             vessels: dict[str, Vessel] = {}
@@ -246,11 +247,14 @@ class MaritimeBot:
                     if vessel.last_ais_update and position.timestamp <= vessel.last_ais_update:
                         stats["stale"] += 1
                         continue
-                    for indicator in evasion.detect_identity_changes(vessel, position):
+                    changes = evasion.detect_identity_changes(vessel, position)
+                    for indicator in changes:
                         self._add_evasion(db, vessel, indicator)
                         stats[indicator.event_type] += 1
-                    if position.name and position.name.upper() != (vessel.name or "").upper():
-                        if not vessel.name.startswith("MMSI "):
+                    renamed = any(i.event_type == "name_change" for i in changes)
+                    if position.name and position.name.upper() != (vessel.name or "").upper() and (renamed or vessel.name.startswith("MMSI ") or len(position.name) > len(vessel.name or "")):
+                        # a real rename, a placeholder being replaced, or the fuller spelling of a cosmetic variant
+                        if not vessel.name.startswith("MMSI ") and renamed:
                             vessel.historical_names = [*(vessel.historical_names or []), vessel.name][-10:]
                         vessel.name = position.name
                     if position.flag and position.flag != "XX" and position.flag != vessel.flag_state:
@@ -262,7 +266,7 @@ class MaritimeBot:
                         stats["ais_gaps"] += 1
                     anomaly = evasion.detect_position_anomaly(vessel.last_ais_update, vessel.current_position_lat, vessel.current_position_lon, position, position.ship_type or vessel.ship_type)
                     if anomaly:
-                        self._add_evasion(db, vessel, anomaly)
+                        self._add_anomaly(db, vessel, anomaly, anomaly_cooldown)
                         stats["position_anomalies"] += 1
 
                 # static enrichment (never overwrite a known value with nothing)
@@ -415,6 +419,27 @@ class MaritimeBot:
             )
             stats["lane_events"] += 1
 
+    def _add_anomaly(self, db: Session, vessel: Vessel, indicator: evasion.EvasionIndicator, cooldown: timedelta) -> None:
+        """One position_anomaly per hull per cooldown window: a jammed GNSS receiver or an MMSI shared by two transponders
+        would otherwise raise a high-severity event every poll.  Repeats are counted on the open event."""
+        if vessel.id is not None and cooldown > timedelta(0):
+            recent = db.execute(
+                select(EvasionEvent).where(EvasionEvent.vessel_id == vessel.id, EvasionEvent.event_type == "position_anomaly", EvasionEvent.timestamp >= indicator.timestamp - cooldown)
+                .order_by(EvasionEvent.timestamp.desc()).limit(1)
+            ).scalars().first()
+            if recent is not None:
+                details = dict(recent.details or {})
+                repeats = int(details.get("repeats", 1)) + 1
+                details.update({"repeats": repeats, "last_reason": (indicator.details or {}).get("reasons", [""])[0], "last_timestamp": indicator.timestamp.isoformat()})
+                recent.details = details
+                recent.timestamp = indicator.timestamp
+                recent.location_lat, recent.location_lon = indicator.lat, indicator.lon
+                recent.confidence_score = max(recent.confidence_score or 0, indicator.confidence)
+                base = (recent.summary or "").split(" [x")[0]
+                recent.summary = f"{base} [x{repeats} in {cooldown.total_seconds() / 3600:.0f} h]"[:300]
+                return
+        self._add_evasion(db, vessel, indicator)
+
     def _add_evasion(self, db: Session, vessel: Vessel, indicator: evasion.EvasionIndicator) -> None:
         if vessel.id is not None:
             duplicate = db.execute(
@@ -422,6 +447,15 @@ class MaritimeBot:
             ).first()
             if duplicate:
                 return
+            if indicator.event_type == "identity_conflict":
+                # the same two transponders arguing over one IMO is one story per day, not one per poll
+                other = (indicator.details or {}).get("previous_mmsi")
+                same_story = db.execute(
+                    select(EvasionEvent.id).where(EvasionEvent.vessel_id == vessel.id, EvasionEvent.event_type == "identity_conflict", EvasionEvent.timestamp >= indicator.timestamp - timedelta(hours=24),
+                                                  EvasionEvent.summary.contains(f"previously MMSI {other}") if other else EvasionEvent.id.is_not(None))
+                ).first()
+                if same_story:
+                    return
         db.add(
             EvasionEvent(
                 vessel=vessel, mmsi=vessel.mmsi, event_type=indicator.event_type, severity=indicator.severity, confidence_score=indicator.confidence,

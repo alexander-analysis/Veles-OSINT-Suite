@@ -62,6 +62,7 @@ maritime:
   review_queue_min_confidence: 0.4
   transshipment_proximity_meters: 500
   transshipment_min_duration_minutes: 30
+  anomaly_cooldown_hours: 6  # one position_anomaly per hull per window; repeats are counted on the open event
   # GNSS spoofing / jamming: N distinct hulls with implausible positions inside ~11 km within the window
   spoofing_interval_minutes: 20
   spoofing_window_hours: 3
