@@ -74,6 +74,67 @@ the rolling baseline), `volume spike` (> 2x the 24 h average in a 5-minute
 window), `coordination` (synchronised move on 2+ exchanges with correlated
 returns) and `liquidation` (futures liquidation cascades).
 
+## Geopolitical
+
+GDELT events (every 15 minutes), GDELT article searches, UK FCDO / UN / OFAC
+announcements and topic-filtered state-media headlines, classified as conflict,
+sanctions, maritime incident, port closure, infrastructure, trade or political.
+The map shows geocoded events (colour = type, size = severity); the list can be
+narrowed by window, severity, country, free text and "linked only" (events the
+engine tied to a market alert, sanctions match, evasion event, STS rendezvous or
+list change). Confirm or dispute an event in the detail panel - both are audited.
+
+## Blockchain
+
+Every OFAC "Digital Currency Address" is a watched wallet. The table shows
+balances (including USDT on Tron), transaction counts and last activity;
+"Transfers" lists movements scored as sanctioned counterparty, exchange
+cash-out, mixer use or whale transfer. The live feeds badge shows the Bitcoin
+mempool stream and the last Ethereum block scanned. Add your own address to the
+watch list with the form (audited).
+
+## Corporate
+
+Listed companies and vessel owners are resolved through GLEIF in rotation.
+"Sanctions exposure" lists companies that are not listed themselves but sit
+directly under (or above) a listed party - the starting point for 50 %-rule
+work. Shell / opaque views surface secrecy jurisdictions, undisclosed parents,
+lapsed registrations and fresh formations. The live search queries GLEIF; an
+"import + walk" pulls the LEI with its parents and subsidiaries.
+
+## Energy
+
+Curated terminals, refineries, LNG plants and STS anchorages. Tanker calls with
+draught changes become shipments (origin, destination, estimated barrels);
+dark-oil indicators flag loadings at sanctioned facilities, AIS gaps and
+spoofing after loading, STS transfers, anchorage loitering and identity changes.
+Mark an indicator "investigating" or "clear" from the list (audited). The chart
+compares laden departures from sanctioned facilities with Brent / WTI.
+
+## Fusion
+
+One queue for every bot's output, ranked by severity and correlation count.
+"Composite alerts" appear when signals from three or more domains share a
+vessel, listed party, wallet, company, facility, aircraft or domain inside the
+window; each carries a narrative summary and can be acknowledged. The
+"Cross-domain brief 24h (PDF)" button on the dashboard renders the same
+material as a report.
+
+## Monitors
+
+Tier 2 / 3 collectors: sanctioned aircraft on ADS-B (map + track per airframe),
+ransomware and breach postings matched to tracked companies and critical
+sectors, state-media narratives (state-only / amplified / mirrored against
+official coverage), the web infrastructure of listed parties (whether a domain
+still resolves and where it is hosted) and enforcement / prosecution / docket
+records naming listed parties.
+
+## Satellite overlay
+
+On the maritime map, the layer control offers NASA GIBS MODIS true-colour
+imagery and thermal anomalies for the previous day - useful context for fires
+at terminals, ice conditions and cloud cover over an area of interest.
+
 ## Linkage
 
 Pick a vessel and see everything it is connected to: shared owner / operator /

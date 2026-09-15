@@ -199,6 +199,14 @@ legal:
 retention:
   market_candles_days: 90
   blockchain_transactions_days: 90
+  # ecosystem tables (purged daily at purge_hour_utc; matched / suspect rows are kept)
+  signal_correlations_days: 30
+  composite_alerts_days: 180
+  aircraft_sightings_days: 90
+  breach_events_days: 180
+  narratives_days: 90
+  legal_events_days: 365
+  energy_days: 180
   geopolitical_events_days: 90
   # Global AIS produces a few million position rows per day before sampling;
   # 30 days + thinning keeps the SQLite file in the low gigabytes on a Pi.

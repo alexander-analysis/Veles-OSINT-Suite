@@ -332,6 +332,9 @@ def start_scheduler() -> BackgroundScheduler:
     register_correlation_jobs()
     register_tier2_jobs()
     register_notification_jobs()
+    from app.bots import maintenance
+
+    maintenance.register(scheduler, _on_loop, int(config_store.get_config().get("retention", {}).get("purge_hour_utc", 2)))
     scheduler.start()
     log.info("started with {} job(s)", len(scheduler.get_jobs()))
     return scheduler

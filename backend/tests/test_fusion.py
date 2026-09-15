@@ -117,3 +117,9 @@ def test_engine_persists_alerts_and_api(client):
     assert brief["signals"]["total"] >= 4 and brief["composite_alerts"] and "Composite alerts" in brief["sections"]
     pdf = client.get("/api/fusion/brief?hours=12&format=pdf&classification=CONFIDENTIAL")
     assert pdf.status_code == 200 and pdf.content[:5] == b"%PDF-" and len(pdf.content) > 3000
+    import asyncio
+
+    from app.bots.maintenance import purge_ecosystem_tables
+
+    purged = asyncio.run(purge_ecosystem_tables())
+    assert purged["signal_correlations"] == 0 and "composite_alerts" in purged  # nothing old enough yet
