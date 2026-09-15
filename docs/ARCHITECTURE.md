@@ -77,4 +77,5 @@ Nginx (static frontend + /api proxy + WebSocket)  <--  Cloudflare Tunnel  <--  a
 | 3 | Maritime bot: AIS ingestion, OFAC/EU/UN screening, evasion/transshipment/ports/zones, map, breach board, audit log UI, WebSocket | done |
 | 4 | Polish: PDF reports, settings editor, dashboard KPIs, linkage explorer, notifications, API token, position-anomaly detection, CI, docs | done (v1.0.0) |
 | 5 (ecosystem tier 1) | Geopolitical event monitor (GDELT + official feeds, classification, cross-domain correlation) | done |
-| 5 (ecosystem tier 1) | Blockchain tracker, corporate intelligence, energy flow monitor, correlation engine | in progress |
+| 5 (ecosystem tier 1) | Blockchain tracker (OFAC wallets on BTC / ETH / TRON, cash-out and mixer detection, whale feed, co-spend clusters) | done |
+| 5 (ecosystem tier 1) | Corporate intelligence, energy flow monitor, correlation engine | in progress |

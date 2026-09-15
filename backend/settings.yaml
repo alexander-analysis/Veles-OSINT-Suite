@@ -96,8 +96,28 @@ geopolitical:
   # Instant notification (webhook / e-mail) for new events at or above this severity
   alert_min_severity: critical
 
+blockchain:
+  # Blockchain tracker: OFAC digital-currency addresses (Bitcoin / Ethereum / Tron) watched through
+  # keyless public APIs (Blockstream, PublicNode RPC, Tronscan) plus whale detection.
+  enabled: true
+  poll_interval_minutes: 10
+  # Addresses polled per run (Blockstream / Tronscan are rate-limited; Ethereum is one batched RPC call)
+  poll_batch_bitcoin: 12
+  poll_batch_tron: 6
+  # Ethereum: sample the newest block every N seconds (~0.7 MB) for whales; sanctioned / mixer stablecoin
+  # flows are queried with topic filters over every block since the last scan (complete coverage)
+  ethereum_scan_enabled: true
+  ethereum_scan_interval_seconds: 180
+  ethereum_max_catchup_blocks: 40
+  # Real-time Bitcoin unconfirmed-transaction stream (blockchain.com): whales + sanctioned-address hits
+  bitcoin_stream_enabled: true
+  whale_min_btc: 100
+  whale_min_eth: 1000
+  whale_min_usd: 5000000
+
 retention:
   market_candles_days: 90
+  blockchain_transactions_days: 90
   geopolitical_events_days: 90
   # Global AIS produces a few million position rows per day before sampling;
   # 30 days + thinning keeps the SQLite file in the low gigabytes on a Pi.

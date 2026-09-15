@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { TrendingUp, Ship, Activity, Database, Clock, ShieldAlert, FileDown, AlertTriangle, Globe } from 'lucide-react';
+import { TrendingUp, Ship, Activity, Database, Clock, ShieldAlert, FileDown, AlertTriangle, Globe, Coins } from 'lucide-react';
 import PageHeader from '../components/common/PageHeader';
 import StatusBadge from '../components/common/StatusBadge';
 import LoadingSpinner from '../components/common/LoadingSpinner';
@@ -47,6 +47,7 @@ export default function Dashboard() {
   const { data: events } = useFetch(`/api/maritime/audit-log?action_type=${SIGNIFICANT}&limit=12`, 30000);
   const { data: geo } = useFetch('/api/geopolitical/summary?hours=24', 60000);
   const { data: geoAlerts } = useFetch('/api/geopolitical/alerts?hours=48&limit=5', 60000);
+  const { data: chain } = useFetch('/api/blockchain/summary?hours=24', 60000);
   const market = health?.bots?.market;
   const maritime = health?.bots?.maritime;
   const sanctions = health?.bots?.sanctions;
@@ -69,7 +70,8 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5 mb-4">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6 mb-4">
+        <Tile icon={Coins} title="Sanctioned crypto wallets" value={chain ? chain.sanctioned_wallets_total : '-'} detail={chain ? `$${Math.round(chain.sanctioned_balance_usd || 0).toLocaleString()} held - ${chain.sanctioned_wallets_active} active 24h` : undefined} tone={chain ? (chain.sanctioned_wallets_active ? 'error' : 'ok') : undefined} to="/blockchain" />
         <Tile icon={Globe} title="Geopolitical events (24h)" value={geo ? geo.total : '-'} detail={geo ? `${(geo.by_severity?.critical || 0) + (geo.by_severity?.high || 0)} high/critical - ${geo.correlations} cross-domain links` : undefined} tone={geo ? ((geo.by_severity?.critical || 0) ? 'error' : (geo.by_severity?.high || 0) ? 'warn' : 'ok') : undefined} to="/geopolitical" />
         <Tile icon={Ship} title="Vessels tracked" value={maritime ? maritime.vessels_tracked.toLocaleString() : '-'} detail={maritime ? `${maritime.vessels_active_1h} active last hour - ${Object.keys(maritime.sources).join(', ') || 'no sources'}` : undefined} tone={maritime ? (maritime.vessels_active_1h ? 'ok' : 'warn') : undefined} to="/maritime" />
         <Tile icon={ShieldAlert} title="Open sanctions breaches" value={maritime ? maritime.open_breaches : '-'} detail={sanctions ? `${listings.toLocaleString()} active listings indexed` : undefined} tone={maritime ? (maritime.open_breaches ? 'error' : 'ok') : undefined} to="/maritime" />

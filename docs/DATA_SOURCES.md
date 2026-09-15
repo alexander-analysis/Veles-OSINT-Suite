@@ -64,6 +64,20 @@ Polygons are coarse by design; refine them for your area of interest.
 
 Feeds are configurable under `geopolitical.official_feeds` / `doc_topics` in `settings.yaml`.
 
+## Blockchain
+
+| Source | What VELES reads | Cadence | Credential |
+|--------|------------------|---------|------------|
+| OFAC SDN remarks (`Digital Currency Address - XBT/ETH/USDT/TRX/...`) | ~500 sanctioned addresses across Bitcoin, Ethereum, Tron, Monero, Litecoin and others become watched wallets (owner, programmes) | hourly sync | none |
+| Blockstream Esplora (`blockstream.info/api`) | Bitcoin address stats and newest 25 transactions per watched address | 12 addresses per 10 min (rotation) | none |
+| PublicNode Ethereum RPC (`ethereum-rpc.publicnode.com`) | Batched balances / nonces of all watched addresses; newest block in full for native whales; `eth_getLogs` for USDT / USDC / DAI transfers to or from sanctioned and mixer addresses (complete coverage) and stablecoin whales (sampled) | 3 min | none (`ETHEREUM_RPC_URL` overrides the endpoint) |
+| Tronscan (`apilist.tronscanapi.com`) | Account balances incl. USDT-TRC20 and newest TRC-20 transfers | 6 addresses per 10 min | none |
+| blockchain.com websocket (`unconfirmed_sub`) | Every unconfirmed Bitcoin transaction, matched locally against sanctioned / mixer addresses and the whale threshold | continuous (~5 tx/s, negligible CPU) | none |
+| mempool.space prices, CoinGecko simple price | BTC / TRX USD prices when the market bot has no candle | 10 min | none |
+| Curated labels (`backend/app/data/crypto_labels.py`) | Exchange hot wallets and mixer contracts used for cash-out / mixer detection; extend with `POST /api/blockchain/wallets` | - | - |
+
+Blockchair is deliberately not used: its keyless tier blacklists an IP after a handful of calls.
+
 ## Optional context
 
 | Source | Use | Credential |

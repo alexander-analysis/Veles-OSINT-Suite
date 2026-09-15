@@ -101,6 +101,20 @@ total notional ($1M/$5M/$20M/$100M), coordination by confidence.
 | `GET /sources` | Feed health (last fetch, status, latency) |
 | `GET /status` / `POST /refresh?job=all|gdelt|doc|feeds|correlate` | Bot status; run a collection job now (202) |
 
+## Blockchain (`/api/blockchain`)
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /wallets?chain=&wallet_type=&sanctioned=&active_hours=&q=&min_balance_usd=&sort=balance|last_active|risk|owner&limit=&offset=` | Tracked wallets (OFAC digital-currency addresses, curated exchange / mixer labels, analyst additions) |
+| `GET /wallets/{chain}/{address}` | Wallet + its recorded transfers, co-spend cluster and explorer link |
+| `POST /wallets` `{"blockchain": "ethereum", "address": "0x...", "label": "...", "wallet_type": "individual", "watch": true}` | Add an address to the watch list (audited as `wallet_watch_added`) |
+| `GET /transactions?hours=&chain=&pattern=&involves_sanctioned=&involves_mixer=&min_usd=&address=` | Recorded transfers (patterns: sanctioned_counterparty, exchange_cashout, exchange_withdrawal_to_sanctioned, sanctioned_mixer_usage, mixer_usage, whale_transfer) |
+| `GET /whales?hours=` | Largest whale transfers |
+| `POST /transactions/{id}/acknowledge?analyst=` | Acknowledge a flagged transfer (audited) |
+| `GET /clusters` | Bitcoin common-input-ownership clusters seeded from sanctioned addresses |
+| `GET /summary?hours=` | Wallet counts by chain, balance held in sanctioned wallets, flagged / whale counts, prices, stream state |
+| `GET /status` / `POST /refresh?job=all|sync|prices|poll|scan` | Bot status; run a job now (202) |
+
 ## Admin (`/api/admin`)
 
 ### `GET /api/admin/config`

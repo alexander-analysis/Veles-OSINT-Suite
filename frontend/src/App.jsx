@@ -14,6 +14,7 @@ const VesselDetail = lazy(() => import('./pages/VesselDetail'));
 const Sanctions = lazy(() => import('./pages/Sanctions'));
 const Correlation = lazy(() => import('./pages/Correlation'));
 const Geopolitical = lazy(() => import('./pages/Geopolitical'));
+const Blockchain = lazy(() => import('./pages/Blockchain'));
 const AuditLogPage = lazy(() => import('./pages/AuditLogPage'));
 const Settings = lazy(() => import('./pages/Settings'));
 
@@ -36,6 +37,7 @@ function App() {
                 <Route path="/maritime/vessel/:mmsi" element={<VesselDetail />} />
                 <Route path="/sanctions" element={<Sanctions />} />
                 <Route path="/geopolitical" element={<Geopolitical />} />
+                <Route path="/blockchain" element={<Blockchain />} />
                 <Route path="/correlation" element={<Correlation />} />
                 <Route path="/audit" element={<AuditLogPage />} />
                 <Route path="/settings" element={<Settings />} />
@@ -48,7 +50,7 @@ function App() {
             <span>VELES OSINT Intelligence Platform</span>
             <span>
               Data: Binance, Kraken, Coinbase, Yahoo Finance; AIS: Fintraffic Digitraffic (CC BY 4.0) and configured providers; OFAC SDN, EU consolidated list,
-              UN Security Council list; GDELT Project, UK FCDO, UN press, OFAC; &copy; OpenStreetMap contributors
+              UN Security Council list; GDELT Project, UK FCDO, UN press, OFAC; Blockstream, PublicNode, Tronscan, blockchain.com; &copy; OpenStreetMap contributors
             </span>
           </div>
         </footer>

@@ -208,6 +208,33 @@ def register_geopolitical_jobs() -> None:
                       id="geopolitical.cleanup_old_data", replace_existing=True)
 
 
+def register_blockchain_jobs() -> None:
+    from app.bots.blockchain import blockchain_bot
+
+    cfg = config_store.get_config()
+    chain = cfg.get("blockchain", {})
+    retention = cfg.get("retention", {})
+    if not chain.get("enabled", True):
+        log.info("blockchain tracker disabled in settings")
+        return
+    boot = datetime.now(timezone.utc)
+    # Wallet sync needs the sanctions lists: first pass ~3 minutes after boot, then hourly
+    scheduler.add_job(_on_loop(blockchain_bot.sync_sanctioned_wallets, timeout=300), "interval", hours=1, next_run_time=boot + timedelta(seconds=180), id="blockchain.sync_wallets", replace_existing=True)
+    scheduler.add_job(_on_loop(blockchain_bot.refresh_prices, timeout=60), "interval", minutes=10, next_run_time=boot + timedelta(seconds=60), id="blockchain.prices", replace_existing=True)
+    scheduler.add_job(_on_loop(blockchain_bot.poll_wallets, timeout=600), "interval", minutes=int(chain.get("poll_interval_minutes", 10)), next_run_time=boot + timedelta(seconds=240), id="blockchain.poll_wallets", replace_existing=True)
+    scheduler.add_job(_on_loop(blockchain_bot.scan_ethereum, timeout=240), "interval", seconds=int(chain.get("ethereum_scan_interval_seconds", 180)), next_run_time=boot + timedelta(seconds=210), id="blockchain.scan_ethereum", replace_existing=True)
+    scheduler.add_job(_on_loop(blockchain_bot.flush_stream, timeout=120), "interval", seconds=30, id="blockchain.flush_stream", replace_existing=True)
+    scheduler.add_job(_on_loop(blockchain_bot.cleanup_old_data, timeout=600), "cron", hour=int(retention.get("purge_hour_utc", 2)), minute=50, id="blockchain.cleanup_old_data", replace_existing=True)
+    if chain.get("bitcoin_stream_enabled", True):
+        bot_loop.run(_start_bitcoin_stream())
+
+
+async def _start_bitcoin_stream() -> None:
+    from app.bots.blockchain import blockchain_bot
+
+    blockchain_bot.ensure_stream()
+
+
 def register_notification_jobs() -> None:
     from app import notifications
 
@@ -225,6 +252,7 @@ def start_scheduler() -> BackgroundScheduler:
     register_sanctions_jobs()
     register_maritime_jobs()
     register_geopolitical_jobs()
+    register_blockchain_jobs()
     register_notification_jobs()
     scheduler.start()
     log.info("started with {} job(s)", len(scheduler.get_jobs()))
@@ -236,9 +264,12 @@ def stop_scheduler() -> None:
         scheduler.shutdown(wait=False)
         log.info("stopped")
     if bot_loop.running:
+        from app.bots.blockchain import blockchain_bot
         from app.bots.maritime import maritime_bot
         from app.bots.market import market_bot
 
+        if blockchain_bot.stream:
+            blockchain_bot.stream.stop()
         for bot in (market_bot, maritime_bot):
             try:
                 bot_loop.run(bot.close(), timeout=10)
