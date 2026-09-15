@@ -80,7 +80,12 @@ systemctl --user enable veles.service >/dev/null
 systemctl --user restart veles.service
 if [ -x "$CLOUDFLARED" ]; then
     systemctl --user enable cloudflared-veles.service >/dev/null
-    systemctl --user restart cloudflared-veles.service
+    # A quick tunnel gets a new hostname every time it starts - keep the existing one across redeploys
+    if systemctl --user is-active --quiet cloudflared-veles.service; then
+        echo "=== cloudflared already running - keeping the current tunnel URL ==="
+    else
+        systemctl --user restart cloudflared-veles.service
+    fi
 fi
 
 # 4. Smoke test --------------------------------------------------------------
