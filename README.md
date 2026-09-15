@@ -7,7 +7,7 @@ OFAC, EU and UN sanctions lists, with evasion detection and an immutable audit
 trail). Runs 24/7 on a Raspberry Pi 5 and is reachable remotely through a
 Cloudflare Tunnel.
 
-**Status: v1.1 - core platform complete; ecosystem tier 1 bots landing (geopolitical monitor and blockchain tracker live).**
+**Status: v1.1 - core platform complete; ecosystem tier 1 bots landing (geopolitical monitor, blockchain tracker and corporate intelligence live).**
 
 | Module | What it does |
 |--------|--------------|
@@ -16,6 +16,7 @@ Cloudflare Tunnel.
 | Maritime intelligence | Live AIS (Digitraffic keyless; aisstream.io / MarineTraffic / AISHub / NMEA feeds / RTL-SDR with credentials or hardware); IMO/name/owner screening against all three lists; AIS gaps, renames, re-flagging, identity conflicts, spoofed positions; ship-to-ship rendezvous; port intelligence; monitored zones and chokepoints; entity linkage and risk scoring; live map over WebSocket |
 | Geopolitical monitor | GDELT 2.0 events and articles, UK FCDO, UN and OFAC announcements classified into conflict / sanctions / maritime incident / port closure / infrastructure / trade / political with severity and impact notes; every event is correlated against market alerts, sanctions breaches, evasion events, STS rendezvous and list changes inside a 24 h window |
 | Blockchain tracker | Every OFAC digital-currency address (Bitcoin, Ethereum, Tron and more) watched through keyless public APIs: balances and token holdings, new transfers scored for exchange cash-outs, mixer use and sanctioned counterparties, a live Bitcoin mempool whale / sanctioned-address feed, Ethereum stablecoin flow capture and common-input clustering |
+| Corporate intelligence | Every listed company and vessel owner resolved through GLEIF in rotation: LEI records, direct / ultimate parents, subsidiaries; unlisted companies under or above a listed party surface as sanctions exposure; shell and opacity indicators (secrecy jurisdictions, undisclosed parents, lapsed registrations, fresh formations); live LEI search with import-and-walk |
 | Compliance | Append-only audit log (enforced in the ORM and the database), classification markings, PDF/JSON/CSV intelligence reports, optional API token, webhook / e-mail alerts and a daily digest |
 
 Docs: [ARCHITECTURE](docs/ARCHITECTURE.md) - [API](docs/API.md) - [DEPLOYMENT](docs/DEPLOYMENT.md) - [DATA_SOURCES](docs/DATA_SOURCES.md) - [USER_GUIDE](docs/USER_GUIDE.md) - [DEVELOPMENT](docs/DEVELOPMENT.md) - [SECURITY](docs/SECURITY.md) - [LICENSES](docs/LICENSES.md)

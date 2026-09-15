@@ -47,6 +47,15 @@ class Settings(BaseSettings):
     OPENWEATHERMAP_API_KEY: str = ""
     RTL_AIS_UDP_PORT: int = 10110
 
+    # Ecosystem bots (all optional - every source has a keyless default)
+    ETHEREUM_RPC_URL: str = ""
+    EDGAR_CONTACT_EMAIL: str = ""
+    COMPANIES_HOUSE_API_KEY: str = ""
+    OPENCORPORATES_API_TOKEN: str = ""
+    ETHERSCAN_API_KEY: str = ""
+    EIA_API_KEY: str = ""
+    NASA_FIRMS_MAP_KEY: str = ""
+
     # Cloudflare Tunnel
     CLOUDFLARE_TOKEN: str = ""
 

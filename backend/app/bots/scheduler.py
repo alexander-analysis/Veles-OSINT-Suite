@@ -235,6 +235,20 @@ async def _start_bitcoin_stream() -> None:
     blockchain_bot.ensure_stream()
 
 
+def register_corporate_jobs() -> None:
+    from app.bots.corporate import corporate_bot
+
+    cfg = config_store.get_config().get("corporate", {})
+    if not cfg.get("enabled", True):
+        log.info("corporate intelligence disabled in settings")
+        return
+    boot = datetime.now(timezone.utc)
+    # Seed from the sanctions lists once they are loaded (~4 min after boot), then daily
+    scheduler.add_job(_on_loop(corporate_bot.seed_companies, timeout=600), "interval", hours=24, next_run_time=boot + timedelta(seconds=240), id="corporate.seed", replace_existing=True)
+    scheduler.add_job(_on_loop(corporate_bot.enrich_companies, timeout=900), "interval", minutes=int(cfg.get("enrich_interval_minutes", 10)), next_run_time=boot + timedelta(seconds=360),
+                      id="corporate.enrich", replace_existing=True)
+
+
 def register_notification_jobs() -> None:
     from app import notifications
 
@@ -253,6 +267,7 @@ def start_scheduler() -> BackgroundScheduler:
     register_maritime_jobs()
     register_geopolitical_jobs()
     register_blockchain_jobs()
+    register_corporate_jobs()
     register_notification_jobs()
     scheduler.start()
     log.info("started with {} job(s)", len(scheduler.get_jobs()))

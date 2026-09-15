@@ -16,7 +16,7 @@ from app.utils.time import utcnow
 
 
 @pytest.fixture(scope="module", autouse=True)
-def _cleanup():
+def _cleanup(client):
     """The test database is shared across modules: remove the rows seeded here so the maritime counts stay exact."""
     yield
     with SessionLocal() as db:

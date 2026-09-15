@@ -37,7 +37,12 @@ def parse_eu(xml_bytes: bytes) -> list[SanctionedEntityRecord]:
         names = [n for n in names if n]
         if not names:
             continue
-        strong = [a.get("wholeName", "").strip() for a in entity.findall("e:nameAlias", NS) if a.get("strong") == "true"]
+        # Strong aliases come in every EU language (nameLanguage GA, DA, EL, ...); prefer the English / untagged Latin spelling
+        aliases_xml = entity.findall("e:nameAlias", NS)
+        strong_aliases = [a for a in aliases_xml if a.get("strong") == "true" and a.get("wholeName", "").strip()]
+        language_rank = {"EN": 0, "": 1}
+        strong_aliases.sort(key=lambda a: (language_rank.get((a.get("nameLanguage") or "").upper(), 2), -sum(ch.isascii() for ch in a.get("wholeName", ""))))
+        strong = [a.get("wholeName", "").strip() for a in strong_aliases]
         name = (strong or names)[0]
         subject = entity.find("e:subjectType", NS)
         entity_type = TYPE_MAP.get(subject.get("code") if subject is not None else "", "company")

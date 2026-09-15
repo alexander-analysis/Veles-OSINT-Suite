@@ -115,6 +115,19 @@ total notional ($1M/$5M/$20M/$100M), coordination by confidence.
 | `GET /summary?hours=` | Wallet counts by chain, balance held in sanctioned wallets, flagged / whale counts, prices, stream state |
 | `GET /status` / `POST /refresh?job=all|sync|prices|poll|scan` | Bot status; run a job now (202) |
 
+## Corporate (`/api/corporate`)
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /companies?q=&country=&linked=&match_type=&exposure_only=&shell=&opaque=&has_lei=&origin=&min_risk=&sort=risk|name|updated|enriched` | Tracked companies (sanctions seeds, vessel owners, ownership-walk discoveries, analyst imports) |
+| `GET /companies/{id}` | Company + shareholders / parents, subsidiaries, officers, ownership chain, the listing it is tied to, GLEIF link |
+| `GET /exposure` | Companies not listed themselves but directly under / above a listed party (`parent`, `ultimate_parent`, `child` match types) |
+| `GET /chains?sanctioned_only=` | Ownership chains with risk scores |
+| `GET /search?q=&live=true` | Live GLEIF search; each hit shows whether it is tracked and whether the name screens against the lists |
+| `POST /ingest` `{"lei": "...", "analyst": "..."}` | Import an LEI with parents / subsidiaries on the bot loop (audited as `company_lookup`) |
+| `GET /summary` | Counts: tracked, resolved, exposure, shells, chains, top countries |
+| `GET /status` / `POST /refresh?job=all|seed|enrich` | Bot status; run seeding / a GLEIF batch now (202) |
+
 ## Admin (`/api/admin`)
 
 ### `GET /api/admin/config`

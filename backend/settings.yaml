@@ -115,6 +115,19 @@ blockchain:
   whale_min_eth: 1000
   whale_min_usd: 5000000
 
+corporate:
+  # Corporate intelligence: sanctioned companies and vessel owners are enriched through GLEIF
+  # (LEI records, parents, subsidiaries) in rotation; SEC EDGAR adds SIC / CIK for US entities.
+  enabled: true
+  enrich_interval_minutes: 10
+  # Companies looked up per run (each costs 1-5 GLEIF calls at ~1 request/s)
+  enrich_batch: 40
+  reenrich_days: 30
+  # Name similarity (legal-form suffixes stripped) required to attach an LEI to a listed name
+  min_name_similarity: 0.9
+  max_children: 50
+  edgar_enabled: true
+
 retention:
   market_candles_days: 90
   blockchain_transactions_days: 90

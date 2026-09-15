@@ -78,6 +78,17 @@ Feeds are configurable under `geopolitical.official_feeds` / `doc_topics` in `se
 
 Blockchair is deliberately not used: its keyless tier blacklists an IP after a handful of calls.
 
+## Corporate registries
+
+| Source | What VELES reads | Cadence | Credential |
+|--------|------------------|---------|------------|
+| Sanctions lists (OFAC / EU / UN company listings, vessel owners) | ~11,000 seed companies; the EU list's English strong alias is now preferred over other-language variants | daily | none |
+| GLEIF API (`api.gleif.org/api/v1`) | LEI records (legal name, other-language names, addresses, status, legal form, creation date), direct / ultimate parents or the reporting exception (`NO_KNOWN_PERSON`, `NON_CONSOLIDATING`, ...), direct children | 40 companies per 10 min (~1 request/s); full pass over the seeds in ~2 days, re-checked every 30 days | none |
+| SEC EDGAR company browse (Atom) | CIK, SIC description and business address for US-registered entities | during enrichment | none - the SEC asks for a contact e-mail in the User-Agent (`EDGAR_CONTACT_EMAIL`) |
+| Companies House / OpenCorporates | Not wired yet - both need API keys (`COMPANIES_HOUSE_API_KEY`, `OPENCORPORATES_API_TOKEN` are reserved in `.env.example`) | - | key |
+
+Name matching strips legal-form tokens (LLC, PAO, GmbH, "Public Joint Stock Company", ...) and compares the listed name and its published aliases against the GLEIF legal name and other names; an LEI is attached only above `corporate.min_name_similarity` (0.9). EDGAR full-text search is not used - it returns 403 to non-browser clients.
+
 ## Optional context
 
 | Source | Use | Credential |

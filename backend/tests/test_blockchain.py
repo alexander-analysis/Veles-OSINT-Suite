@@ -21,7 +21,7 @@ REMARKS = (
 
 
 @pytest.fixture(scope="module", autouse=True)
-def _cleanup():
+def _cleanup(client):
     yield
     with SessionLocal() as db:
         db.query(BlockchainTransaction).delete()
