@@ -12,6 +12,7 @@ from app.bots.infra import infra_bot
 from app.bots.leaks import leaks_bot
 from app.bots.legal import legal_bot
 from app.bots.narratives import narrative_bot
+from app.bots.psc import psc_bot
 from app.bots.corporate import corporate_bot
 from app.bots.correlation import correlation_engine
 from app.bots.energy import energy_bot
@@ -71,5 +72,5 @@ def health(response: Response, db: Session = Depends(get_db)) -> HealthResponse:
         scheduler=SchedulerHealth(enabled=settings.SCHEDULER_ENABLED, **scheduler_status()),
         last_market_update=last_market_update,
         last_ais_update=last_ais_update,
-        bots={"market": market_bot.status(), "maritime": maritime_bot.status(), "sanctions": {k: sanctions_bot.status()[k] for k in ("active_listings", "index_size", "refreshing")}, "geopolitical": geopolitical_bot.status(), "blockchain": blockchain_bot.status(), "corporate": corporate_bot.status(), "energy": energy_bot.status(), "fusion": correlation_engine.status(), "aviation": aviation_bot.status(), "leaks": leaks_bot.status(), "infra": infra_bot.status(), "legal": legal_bot.status(), "narratives": narrative_bot.status(), "auth": auth_status()} if db_ok else {"auth": auth_status()},
+        bots={"market": market_bot.status(), "maritime": maritime_bot.status(), "sanctions": {k: sanctions_bot.status()[k] for k in ("active_listings", "index_size", "refreshing")}, "geopolitical": geopolitical_bot.status(), "blockchain": blockchain_bot.status(), "corporate": corporate_bot.status(), "energy": energy_bot.status(), "fusion": correlation_engine.status(), "aviation": aviation_bot.status(), "leaks": leaks_bot.status(), "infra": infra_bot.status(), "legal": legal_bot.status(), "narratives": narrative_bot.status(), "psc": psc_bot.status(), "auth": auth_status()} if db_ok else {"auth": auth_status()},
     )

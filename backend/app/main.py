@@ -67,6 +67,7 @@ app.include_router(tier2.leaks, prefix="/api/leaks")
 app.include_router(tier2.narratives, prefix="/api/narratives")
 app.include_router(tier2.infra, prefix="/api/infra")
 app.include_router(tier2.legal, prefix="/api/legal")
+app.include_router(tier2.psc, prefix="/api/psc")
 app.include_router(admin.router, prefix="/api/admin")
 
 # ---------------------------------------------------------------------------

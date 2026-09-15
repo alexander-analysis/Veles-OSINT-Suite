@@ -30,6 +30,7 @@ DOMAIN_OF_TYPE = {
     "narrative": "information",
     "legal_event": "legal",
     "infra_asset": "infrastructure",
+    "psc_event": "maritime",
 }
 
 

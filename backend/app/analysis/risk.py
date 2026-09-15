@@ -61,6 +61,15 @@ def compute_risk_score(db: Session, vessel: Vessel, days: int = 30) -> tuple[flo
         weights.append(min(0.5, 0.2 * sts))
         factors["transshipments"] = sts
 
+    if vessel.imo:
+        from app.models.tier2 import PscEvent
+
+        psc_rows = db.execute(select(PscEvent.event_type, func.count()).where(PscEvent.imo == vessel.imo, or_(PscEvent.event_date >= utcnow() - timedelta(days=365), PscEvent.event_type == "ban")).group_by(PscEvent.event_type)).all()
+        if psc_rows:
+            counts = {kind: n for kind, n in psc_rows}
+            weights.append(min(0.5, 0.15 * counts.get("detention", 0) + 0.35 * counts.get("ban", 0)))
+            factors["port_state_control"] = counts
+
     if vessel.flag_state in SHADOW_FLEET_FLAGS and "tanker" in (vessel.ship_type or "").lower():
         weights.append(0.1)
         factors["flag_of_convenience_tanker"] = vessel.flag_state

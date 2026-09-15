@@ -285,9 +285,13 @@ def register_tier2_jobs() -> None:
     from app.bots.leaks import leaks_bot
     from app.bots.legal import legal_bot
     from app.bots.narratives import narrative_bot
+    from app.bots.psc import psc_bot
 
     cfg = config_store.get_config()
     boot = datetime.now(timezone.utc)
+    psc = cfg.get("psc", {})
+    if psc.get("enabled", True):
+        scheduler.add_job(_on_loop(psc_bot.fetch, timeout=600), "interval", hours=int(psc.get("interval_hours", 6)), next_run_time=boot + timedelta(seconds=840), id="psc.fetch", replace_existing=True)
     aviation = cfg.get("aviation", {})
     if aviation.get("enabled", True):
         scheduler.add_job(_on_loop(aviation_bot.sync_aircraft, timeout=300), "interval", hours=12, next_run_time=boot + timedelta(seconds=300), id="aviation.sync", replace_existing=True)

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Plane, ShieldAlert, Megaphone, Globe2, Gavel, RefreshCw, ExternalLink } from 'lucide-react';
+import { Plane, ShieldAlert, Megaphone, Globe2, Gavel, Anchor, RefreshCw, ExternalLink } from 'lucide-react';
 import clsx from 'clsx';
 import PageHeader from '../components/common/PageHeader';
 import StatusBadge from '../components/common/StatusBadge';
@@ -209,15 +209,49 @@ function Legal() {
   );
 }
 
-const TABS = [['aviation', 'Aviation', Plane], ['leaks', 'Leaks & breaches', ShieldAlert], ['narratives', 'Narratives', Megaphone], ['infra', 'Domains & hosting', Globe2], ['legal', 'Legal & enforcement', Gavel]];
+
+function PortStateControl() {
+  const [view, setView] = useState('flagged');
+  const { data: summary, refetch: r1 } = useFetch('/api/psc/summary?days=90', 60000);
+  const params = view === 'flagged' ? '&flagged_only=true' : view === 'tankers' ? '&tankers_only=true' : view === 'bans' ? '&event_type=ban' : view === 'matched' ? '&matched_only=true' : '';
+  const { data: events, refetch: r2 } = useFetch(`/api/psc/events?days=90&limit=300${params}`, 60000);
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-3 text-xs">
+        {summary && <span className="card px-3 py-2"><b>{summary.events}</b> PSC events / 90 d ({Object.entries(summary.by_source || {}).map(([k, n]) => `${label(k)} ${n}`).join(', ') || '-'}) - <b>{summary.matched_vessels}</b> on tracked hulls - <b>{summary.flagged_vessels}</b> on flagged hulls - <b>{summary.bans_on_record}</b> bans on record - flags: {(summary.top_flags || []).slice(0, 5).map((f) => `${f.flag} ${f.events}`).join(', ')}</span>}
+        <select value={view} onChange={(e) => setView(e.target.value)} className="border border-gray-300 rounded px-1 py-0.5 bg-white"><option value="flagged">flagged hulls</option><option value="matched">tracked hulls</option><option value="tankers">tankers</option><option value="bans">bans</option><option value="all">all</option></select>
+        <span className="ml-auto" /><RunButton path="/api/psc/refresh" label="Fetch now" onDone={() => { r1(); r2(); }} />
+      </div>
+      <div className="card overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead className="text-left text-gray-500 border-b border-gray-200"><tr><th className="py-1 pr-2 font-medium">Type</th><th className="py-1 pr-2 font-medium">Ship</th><th className="py-1 pr-2 font-medium">Flag</th><th className="py-1 pr-2 font-medium">Ship type</th><th className="py-1 pr-2 font-medium">Port</th><th className="py-1 pr-2 font-medium">Date</th><th className="py-1 pr-2 font-medium">Company</th><th className="py-1 font-medium">Deficiencies</th></tr></thead>
+          <tbody>{(events || []).map((e) => (
+            <tr key={e.id} className={clsx('border-b border-gray-100', e.vessel_flagged && 'bg-red-50/40')}>
+              <td className="py-1 pr-2"><StatusBadge tone={e.event_type === 'ban' ? 'error' : e.vessel_flagged ? 'error' : 'warn'}>{e.event_type}</StatusBadge> <span className="text-gray-400">{label(e.source)}</span></td>
+              <td className="py-1 pr-2"><div className="font-medium">{e.vessel_mmsi ? <a href={`/maritime/vessel/${e.vessel_mmsi}`} className="text-steel-700 hover:underline">{e.ship_name}</a> : e.ship_name}</div><div className="text-gray-500 font-mono">IMO {e.imo || '-'}{e.vessel_flagged ? ' - flagged in VELES' : e.vessel_id ? ' - tracked' : ''}</div></td>
+              <td className="py-1 pr-2">{e.flag || '-'}</td><td className="py-1 pr-2">{e.ship_type || '-'}</td>
+              <td className="py-1 pr-2">{e.port || '-'} <span className="text-gray-500">{e.port_country || ''}</span></td>
+              <td className="py-1 pr-2 whitespace-nowrap text-gray-500">{e.event_date ? new Date(e.event_date).toLocaleDateString() : '-'}{e.release_date ? ` → ${new Date(e.release_date).toLocaleDateString()}` : ''}</td>
+              <td className="py-1 pr-2 max-w-[180px] truncate" title={e.company || ''}>{e.company || '-'}</td>
+              <td className="py-1 text-gray-500 max-w-[320px]"><div className="truncate" title={(e.deficiencies || []).join(' | ')}>{e.deficiency_count ? `${e.deficiency_count}: ${(e.deficiencies || []).slice(0, 2).map((d) => d.split(' - ').slice(1).join(' - ')).join('; ')}` : (e.details?.ban_reason?.description || '-')}</div></td>
+            </tr>
+          ))}{!events?.length && <tr><td colSpan={8} className="py-2 text-gray-500">No port state control records in this view yet - Paris MoU (THETIS) and Tokyo MoU (APCIS) are polled every 6 hours.</td></tr>}</tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+const TABS = [['aviation', 'Aviation', Plane], ['psc', 'Port state control', Anchor], ['leaks', 'Leaks & breaches', ShieldAlert], ['narratives', 'Narratives', Megaphone], ['infra', 'Domains & hosting', Globe2], ['legal', 'Legal & enforcement', Gavel]];
 
 export default function Monitors() {
   const [tab, setTab] = useState('aviation');
   return (
     <div>
-      <PageHeader title="Monitors" subtitle="Tier 2 / 3 collectors: sanctioned aircraft on ADS-B, ransomware and breach postings, state-media narratives, listed parties' web infrastructure, courts and enforcement" />
+      <PageHeader title="Monitors" subtitle="Tier 2 / 3 collectors: sanctioned aircraft on ADS-B, port state control detentions and bans, ransomware and breach postings, state-media narratives, listed parties' web infrastructure, courts and enforcement" />
       <div className="card mb-4"><div className="flex flex-wrap gap-1 text-xs">{TABS.map(([key, text, Icon]) => <button key={key} type="button" onClick={() => setTab(key)} className={clsx('px-2 py-1 rounded border inline-flex items-center gap-1', tab === key ? 'bg-steel-700 text-white border-steel-700' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-100')}><Icon size={12} aria-hidden="true" /> {text}</button>)}</div></div>
       {tab === 'aviation' && <Aviation />}
+      {tab === 'psc' && <PortStateControl />}
       {tab === 'leaks' && <Leaks />}
       {tab === 'narratives' && <Narratives />}
       {tab === 'infra' && <Infra />}

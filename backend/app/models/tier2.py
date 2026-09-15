@@ -173,3 +173,35 @@ class LegalEvent(Base):
     details = Column(JSON)
 
     __table_args__ = (Index("ix_legal_events_source_ref", "source", "source_id", unique=True),)
+
+
+class PscEvent(Base):
+    """Port State Control detention or banning (Paris MoU THETIS, Tokyo MoU APCIS) - keyed by IMO so it joins our vessels."""
+
+    __tablename__ = "psc_events"
+
+    id = Column(Integer, primary_key=True)
+    source = Column(String(30), nullable=False, index=True)  # paris_mou, tokyo_mou
+    source_id = Column(String(120), nullable=False)
+    event_type = Column(String(20), nullable=False, index=True)  # detention, ban
+    imo = Column(String(20), index=True)
+    ship_name = Column(String(200), index=True)
+    flag = Column(String(3), index=True)
+    ship_type = Column(String(100))
+    gross_tonnage = Column(Float)
+    year_built = Column(Integer)
+    company = Column(String(300), index=True)
+    class_society = Column(String(200))
+    port = Column(String(200))
+    port_country = Column(String(3), index=True)
+    event_date = Column(DateTime, index=True)
+    release_date = Column(DateTime)
+    deficiencies = Column(JSON)
+    deficiency_count = Column(Integer)
+    vessel_id = Column(Integer, ForeignKey("vessels.id"), index=True)
+    vessel_flagged = Column(Boolean, default=False, nullable=False, index=True)  # our vessel record is sanctioned / high risk
+    relevance_score = Column(Float, index=True)
+    discovered_at = Column(DateTime, default=utcnow, nullable=False, index=True)
+    details = Column(JSON)
+
+    __table_args__ = (Index("ix_psc_events_source_ref", "source", "source_id", unique=True), Index("ix_psc_events_imo_date", "imo", "event_date"))

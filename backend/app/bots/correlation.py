@@ -29,7 +29,7 @@ from app.models.geopolitical import GeopoliticalEvent
 from app.models.maritime import EvasionEvent, PortCallEvent, SanctionsBreach, TransshipmentEvent, Vessel
 from app.models.market import CoordinationEvent, LiquidationCascade, MarketAlert
 from app.models.sanctions import SanctionsEntity, SanctionsUpdate
-from app.models.tier2 import AircraftSighting, BreachEvent, InfraAsset, LegalEvent, Narrative
+from app.models.tier2 import AircraftSighting, BreachEvent, InfraAsset, LegalEvent, Narrative, PscEvent
 from app.utils import config_store
 from app.utils.logger import logger
 from app.utils.time import utcnow
@@ -231,6 +231,15 @@ def collect_signals(db: Session, since: datetime, limit_per_type: int = 400) -> 
         s = Signal("legal_event", e.id, e.event_date or e.discovered_at, e.title, "high" if e.matched_entity_id or (e.penalty_usd or 0) >= 1_000_000 else "medium")
         s.add("entity", e.matched_entity_name, *(e.details or {}).get("parties", [])[:10])
         s.add("theme", "sanctions" if e.source in ("ofac_enforcement", "courtlistener") else "legal")
+        signals.append(s)
+    for e in db.execute(select(PscEvent).where(PscEvent.discovered_at >= since, PscEvent.relevance_score >= 0.45).limit(limit_per_type)).scalars():
+        mmsi = db.execute(select(Vessel.mmsi).where(Vessel.id == e.vessel_id)).scalar() if e.vessel_id else None
+        s = Signal("psc_event", e.id, e.event_date or e.discovered_at, f"{e.ship_name} ({e.flag or '?'}) {e.event_type} by {e.source.replace('_', ' ')}{' at ' + e.port if e.port else ''}" + (f" - {e.deficiency_count} deficiencies" if e.deficiency_count else ""),
+                   "high" if e.vessel_flagged else "medium")
+        s.add("vessel", mmsi)
+        s.add("entity", e.company, e.ship_name if e.vessel_flagged else None)
+        s.add("country", e.flag, e.port_country)
+        s.add("sector", "shipping")
         signals.append(s)
     for a in db.execute(select(InfraAsset).where(InfraAsset.last_checked >= since, InfraAsset.is_live.is_(True), InfraAsset.risk_score >= 0.6).limit(limit_per_type)).scalars():
         s = Signal("infra_asset", a.id, a.last_checked, f"{a.value} live for listed party {a.entity_name or '?'} - hosted {a.hosting_country or '?'} ({a.asn_org or '?'})", "medium")

@@ -112,6 +112,7 @@ Cargo volumes are coarse estimates (size class x 95 % x barrels/tonne, scaled by
 | Have I Been Pwned (`/api/v3/breaches`) | Breach catalogue (domain, date, record count, data classes) | 60 min | none |
 | Own geopolitical feed (RT, TASS, Global Times items) | Headline clustering into narratives, compared with official / non-state coverage | 30 min | none |
 | rdap.org, crt.sh, system DNS | Registration data, hosting ASN / country, certificate-transparency subdomains for domains named in OFAC listings | 15 domains per 20 min, re-checked every 14 days | none |
+| Paris MoU THETIS public REST (`portal.emsa.europa.eu/o/portlet-public/rest/detention|ban`), Tokyo MoU APCIS detention list (`apcis.tmou.org`, monthly POST) | Current detentions, bannings and Asia-Pacific monthly detentions with deficiencies, joined to tracked vessels by IMO | 6 h | none |
 | OFAC civil penalties page, DOJ news RSS (`justice.gov/news/rss`), CourtListener v4 search | Enforcement actions, sanctions-related prosecutions, dockets naming listed parties | 6 h / 30 min | none (CourtListener anonymous tier, 2 s pacing) |
 | NASA GIBS / FIRMS, Companies House, OpenCorporates, EIA, Etherscan | Reserved for keyed or imagery sources - see `.env.example` | - | key |
 

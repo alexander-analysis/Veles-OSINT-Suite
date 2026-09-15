@@ -123,6 +123,8 @@ material as a report.
 ## Monitors
 
 Tier 2 / 3 collectors: sanctioned aircraft on ADS-B (map + track per airframe),
+port state control detentions and bans (Paris and Tokyo MoU) joined to the vessels
+VELES tracks - a detention on a flagged hull is highlighted and raises its risk score,
 ransomware and breach postings matched to tracked companies and critical
 sectors, state-media narratives (state-only / amplified / mirrored against
 official coverage), the web infrastructure of listed parties (whether a domain

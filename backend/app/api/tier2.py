@@ -12,10 +12,11 @@ from app.bots.infra import infra_bot
 from app.bots.leaks import leaks_bot
 from app.bots.legal import legal_bot
 from app.bots.narratives import narrative_bot
+from app.bots.psc import psc_bot
 from app.bots.runtime import bot_loop
 from app.database import get_db
 from app.models.audit import AuditLog
-from app.models.tier2 import Aircraft, AircraftSighting, BreachEvent, InfraAsset, LegalEvent, Narrative
+from app.models.tier2 import Aircraft, AircraftSighting, BreachEvent, InfraAsset, LegalEvent, Narrative, PscEvent
 from app.schemas.common import APIModel
 from app.utils.serialization import jsonable
 from app.utils.time import utcnow
@@ -25,6 +26,7 @@ leaks = APIRouter(tags=["leaks"])
 narratives = APIRouter(tags=["narratives"])
 infra = APIRouter(tags=["infra"])
 legal = APIRouter(tags=["legal"])
+psc = APIRouter(tags=["psc"])
 
 
 # ------------------------------------------------------------------ schemas
@@ -369,3 +371,87 @@ def legal_refresh(job: str = Query("all", pattern="^(all|official|dockets)$")) -
     for name in selected:
         bot_loop.submit(jobs[name]())
     return {"status": "started", "jobs": selected}
+
+
+# ---------------------------------------------------------------------- psc
+class PscOut(APIModel):
+    id: int
+    source: str
+    event_type: str
+    imo: str | None = None
+    ship_name: str | None = None
+    flag: str | None = None
+    ship_type: str | None = None
+    gross_tonnage: float | None = None
+    year_built: int | None = None
+    company: str | None = None
+    class_society: str | None = None
+    port: str | None = None
+    port_country: str | None = None
+    event_date: datetime | None = None
+    release_date: datetime | None = None
+    deficiencies: list[str] | None = None
+    deficiency_count: int | None = None
+    vessel_id: int | None = None
+    vessel_mmsi: str | None = None
+    vessel_flagged: bool = False
+    relevance_score: float | None = None
+    discovered_at: datetime
+    details: dict[str, Any] | None = None
+
+
+def _psc_out(rows) -> list[PscOut]:
+    out = []
+    for event, mmsi in rows:
+        item = PscOut.model_validate(event)
+        item.vessel_mmsi = mmsi
+        out.append(item)
+    return out
+
+
+@psc.get("/events", response_model=list[PscOut])
+def list_psc(days: int = Query(90, ge=1, le=3650), event_type: str | None = None, source: str | None = None, flagged_only: bool = False, matched_only: bool = False, tankers_only: bool = False,
+             flag: str | None = None, q: str | None = Query(None, max_length=120), limit: int = Query(200, ge=1, le=2000), db: Session = Depends(get_db)) -> list[PscOut]:
+    from app.models.maritime import Vessel
+
+    query = select(PscEvent, Vessel.mmsi).outerjoin(Vessel, Vessel.id == PscEvent.vessel_id).where(or_(PscEvent.event_date >= utcnow() - timedelta(days=days), PscEvent.event_type == "ban"))
+    if event_type:
+        query = query.where(PscEvent.event_type == event_type)
+    if source:
+        query = query.where(PscEvent.source == source)
+    if flagged_only:
+        query = query.where(PscEvent.vessel_flagged.is_(True))
+    if matched_only:
+        query = query.where(PscEvent.vessel_id.is_not(None))
+    if tankers_only:
+        query = query.where(PscEvent.ship_type.ilike("%tank%"))
+    if flag:
+        query = query.where(PscEvent.flag == flag.upper())
+    if q:
+        query = query.where(or_(PscEvent.ship_name.ilike(f"%{q}%"), PscEvent.imo.ilike(f"%{q}%"), PscEvent.company.ilike(f"%{q}%"), PscEvent.port.ilike(f"%{q}%")))
+    rows = db.execute(query.order_by(PscEvent.relevance_score.desc().nulls_last(), PscEvent.event_date.desc().nulls_last()).limit(limit)).all()
+    return _psc_out(rows)
+
+
+@psc.get("/vessel/{imo}", response_model=list[PscOut])
+def psc_by_imo(imo: str, db: Session = Depends(get_db)) -> list[PscOut]:
+    from app.models.maritime import Vessel
+
+    rows = db.execute(select(PscEvent, Vessel.mmsi).outerjoin(Vessel, Vessel.id == PscEvent.vessel_id).where(PscEvent.imo == imo).order_by(PscEvent.event_date.desc().nulls_last())).all()
+    return _psc_out(rows)
+
+
+@psc.get("/summary")
+def psc_summary(days: int = Query(30, ge=1, le=3650), db: Session = Depends(get_db)) -> dict[str, Any]:
+    return jsonable(psc_bot.summary(db, days))
+
+
+@psc.get("/status")
+def psc_status() -> dict[str, Any]:
+    return jsonable(psc_bot.status())
+
+
+@psc.post("/refresh", status_code=202)
+def psc_refresh() -> dict[str, Any]:
+    bot_loop.submit(psc_bot.fetch())
+    return {"status": "started"}

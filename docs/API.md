@@ -166,6 +166,7 @@ total notional ($1M/$5M/$20M/$100M), coordination by confidence.
 | `GET /api/narratives/?days=&divergence=&min_score=` / `GET /summary` / `POST /refresh` | State-media narrative clusters (state_only / amplified / mirrored) |
 | `GET /api/infra/assets?live=&country=&q=&checked=&min_risk=` / `GET /summary` / `POST /refresh?job=all|seed|footprint` | Domains from OFAC "Website" remarks: registration, resolution, hosting, certificate estate, findings |
 | `GET /api/legal/events?days=&source=&event_type=&matched_only=&q=` / `GET /summary` / `POST /refresh?job=all|official|dockets` | OFAC penalties, DOJ releases, CourtListener dockets naming listed parties |
+| `GET /api/psc/events?days=&event_type=&source=&flagged_only=&matched_only=&tankers_only=&flag=&q=` / `GET /api/psc/vessel/{imo}` / `GET /summary` / `POST /refresh` | Port State Control detentions and bans (Paris MoU THETIS, Tokyo MoU APCIS) joined to tracked vessels; flagged hulls raise the vessel risk score |
 
 ## Admin (`/api/admin`)
 

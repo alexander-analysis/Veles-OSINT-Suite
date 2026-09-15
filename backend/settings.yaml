@@ -190,6 +190,13 @@ infra:
   batch: 15
   recheck_days: 14
 
+psc:
+  # Port State Control: Paris MoU current detentions + bans (THETIS), Tokyo MoU monthly detention list (APCIS)
+  enabled: true
+  interval_hours: 6
+  paris_enabled: true
+  tokyo_enabled: true
+
 legal:
   # OFAC civil penalties, DOJ press releases (sanctions keywords), CourtListener dockets naming listed parties
   enabled: true

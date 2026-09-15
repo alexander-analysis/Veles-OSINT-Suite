@@ -17,6 +17,7 @@ from app.integrations.infra import extract_domains
 from app.integrations.legal import parse_courtlistener, parse_ofac_penalties
 from app.models.corporate import Company
 from app.models.geopolitical import GeopoliticalEvent
+from app.models.maritime import Vessel
 from app.models.sanctions import SanctionsEntity
 from app.models.tier2 import Aircraft, AircraftSighting, BreachEvent, InfraAsset, LegalEvent, Narrative
 from app.utils.time import utcnow
@@ -208,3 +209,55 @@ def test_bots_with_mocked_network(client, monkeypatch):
 def db_entity_id(source_id: str) -> int:
     with SessionLocal() as db:
         return db.query(SanctionsEntity.id).filter_by(source_id=source_id).scalar()
+
+
+def test_psc_monitor(client, monkeypatch):
+    from app.bots.psc import PscBot
+    from app.integrations import psc as psc_integration
+    from app.integrations.psc import parse_apcis, parse_thetis_bans, parse_thetis_detentions
+    from app.models.tier2 import PscEvent
+
+    thetis = parse_thetis_detentions([{"id": 1, "imoNumber": "9700001", "shipName": "TEST SHADOW AFRA", "flag": {"code": "GA", "description": "Gabon"}, "shipType": {"description": "Oil tanker", "tanker": True},
+                                       "detentionDate": "15/09/2026", "detentionPort": {"name": "Rijeka", "country": {"code": "HR", "description": "Croatia"}}, "detentionReportingAuthority": {"description": "Croatia"}}])
+    assert thetis[0].imo == "9700001" and thetis[0].flag == "GA" and thetis[0].port_country == "HR" and thetis[0].event_date.day == 15
+    bans = parse_thetis_bans([{"id": 2, "imoNumber": "9418286", "shipName": "SELAM", "flag": {"code": "KN"}, "ismCompany": {"name": "Unimarin Denizcilik", "imoNumber": "5322090"}, "banDate": "10/09/2026", "banReason": {"description": "Multiple detentions"}}])
+    assert bans[0].event_type == "ban" and bans[0].company == "Unimarin Denizcilik"
+    html = ("<table><tr><th>x</th></tr><tr><td>1</td><td>9310745</td><td>AC KATHRYN</td><td>Panama</td><td>2004-11-01</td><td>19885</td><td>Bulk carrier</td><td>NKK</td><td>NKK;</td><td>SINCERE INDUSTRIAL CORP</td>"
+            "<td>Shanghai, China</td><td>01.08.2026</td><td>04.08.2026</td><td>11124 - LIFE SAVING APPLIANCES - x<br>03105 - WATERTIGHT - y</td></tr></table>")
+    apcis = parse_apcis(html)
+    assert apcis[0].imo == "9310745" and apcis[0].flag == "PA" and apcis[0].port == "Shanghai" and apcis[0].port_country == "CN" and len(apcis[0].deficiencies) == 2 and apcis[0].gross_tonnage == 19885
+
+    async def fake_paris():
+        return thetis, bans
+
+    async def fake_tokyo(year, month):
+        return apcis
+
+    monkeypatch.setattr(psc_integration, "fetch_paris", fake_paris)
+    monkeypatch.setattr(psc_integration, "fetch_tokyo", fake_tokyo)
+    with SessionLocal() as db:
+        vessel = db.query(Vessel).filter_by(imo="9700001").first()
+        if vessel is None:
+            vessel = Vessel(mmsi="273777001", imo="9700001", name="TEST SHADOW AFRA", flag_state="GA", ship_type="Tanker")
+            db.add(vessel)
+        vessel.sanctioned_status, vessel.risk_score = "flagged", 0.7
+        db.commit()
+    result = asyncio.run(PscBot().fetch())
+    assert result["inserted"] == 3 and result["matched_vessels"] == 1 and result["flagged"] == 1
+    assert asyncio.run(PscBot().fetch())["inserted"] == 0
+    with SessionLocal() as db:
+        flagged = db.query(PscEvent).filter_by(imo="9700001").one()
+        assert flagged.vessel_flagged and flagged.relevance_score >= 0.9 and flagged.vessel_id
+    rows = client.get("/api/psc/events?days=365&flagged_only=true").json()
+    assert rows and rows[0]["ship_name"] == "TEST SHADOW AFRA" and rows[0]["event_date"].endswith("Z")
+    assert client.get("/api/psc/events?days=365&event_type=ban").json()[0]["ship_name"] == "SELAM"
+    assert client.get("/api/psc/vessel/9310745").json()[0]["port"] == "Shanghai"
+    summary = client.get("/api/psc/summary?days=365").json()
+    assert summary["events"] >= 3 and summary["bans_on_record"] == 1 and summary["flagged_vessels"] == 1
+    assert client.get("/api/psc/status").status_code == 200
+    with SessionLocal() as db:
+        db.query(PscEvent).delete()
+        vessel = db.query(Vessel).filter_by(imo="9700001").first()
+        if vessel:
+            vessel.sanctioned_status, vessel.risk_score = "clear", 0.0
+        db.commit()
